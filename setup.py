@@ -1,11 +1,5 @@
 #!/usr/bin/env python
-
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
-
-import sys,os
+from setuptools import setup, Extension, find_packages
 
 if __name__ == "__main__":
 
@@ -14,6 +8,6 @@ if __name__ == "__main__":
         version="0.0.1",
         author="Ben Shanks",
         author_email="benjamin.shanks@gmail.com",
-        packages=["waffle"],
+        packages=find_packages(),
         install_requires=["numpy", "scipy", "pandas", "tables", "future"]
     )

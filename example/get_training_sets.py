@@ -7,7 +7,7 @@ def main():
 
     runList = np.arange(11510, 11600)
 
-    chanList = [600,626,672, 692]
+    chanList = [600,626,672, 692, 648, 640]
 
     #data processing
 
