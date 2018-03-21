@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from pygama.waveform import Waveform
 from siggen import PPC
 
-from . import VelocityModel, ElectronicsModel, ElectronicsModel2, ImpurityModel
+from . import VelocityModel, ElectronicsModel, ImpurityModel, ImpurityModelEnds
 
 max_float = sys.float_info.max
 
@@ -34,9 +34,9 @@ class Model(object):
         self.changed_wfs = np.zeros(self.num_waveforms)
 
         #Set up all the models...
-        self.electronics_model = ElectronicsModel2()
+        self.electronics_model = ElectronicsModel()
         self.velo_model = VelocityModel(include_beta=False)
-        self.imp_model = ImpurityModel(self.detector.imp_avg_lims, self.detector.imp_grad_lims)
+        self.imp_model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length)
 
         self.tf_first_idx = 0
         self.velo_first_idx = self.tf_first_idx + self.electronics_model.get_num_params()

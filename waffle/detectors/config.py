@@ -60,6 +60,8 @@ def detector_info_to_conf_file(detector_info, output_name):
     siggen_dict["geometry"]["pc_length"] = np.round(detector_info["pc_length"],2)
     siggen_dict["geometry"]["pc_radius"] = np.round(detector_info["pc_diameter"]/2.,2)
 
+    siggen_dict["detector"]["xtal_HV"] = detector_info["operating_v"]
+
     def format_conf_line(field_name, field_value):
         return "{:30}{}\n".format(field_name, field_value)
 
@@ -73,6 +75,9 @@ def detector_info_to_conf_file(detector_info, output_name):
 
 def get_ortec_siggen_default(detector_name):
     return {
+        "general":{
+        "verbosity_level":0
+        },
         "geometry":{
         "top_bullet_radius":    1.2,
         "bottom_bullet_radius": 0,

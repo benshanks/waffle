@@ -4,30 +4,21 @@ from scipy import signal
 
 from ._parameterbase import ModelBaseClass, Parameter
 
-class ElectronicsModel2(ModelBaseClass):
+class ElectronicsModel(ModelBaseClass):
     """
-    Specify the model in Python.
+    2-pole digital filter for both HP and LP halves
     """
     def __init__(self,timestep=1E-9):
         self.num_params = 4
         self.timestep=timestep
 
-        #pretty good starting point for MJD detectors
-        pole_mag = 2.57E7
-        pole_phi = 145 * np.pi/180
-
-        rc_mag = -6
-        rc_phi = -5
-
         self.params = [
-            Parameter("pole_mag", "gaussian", pole_mag, 1E7, 1E5, 0.5E9),
-            Parameter("pole_phi", "uniform", lim_lo=(2./3)*np.pi, lim_hi=np.pi),
-            Parameter("rc_mag", "gaussian", rc_mag, 5, lim_lo=-10, lim_hi=0),
-            Parameter("rc_phi", "gaussian", rc_phi, 5, lim_lo=-10, lim_hi=0),
-            # Parameter("zmag_h", "gaussian", 1, 5, lim_lo=0, lim_hi=1E9),
-            # Parameter("zphi_h", "uniform", lim_lo=0, lim_hi=np.pi),
-            # Parameter("zmag_l", "gaussian", 1, 5, lim_lo=0, lim_hi=1E9),
-            # Parameter("zphi_l", "uniform", lim_lo=0, lim_hi=np.pi),
+            Parameter("pole_mag", "uniform", lim_lo=0, lim_hi=1),
+            Parameter("pole_phi", "uniform", lim_lo=0, lim_hi=np.pi),
+            # Parameter("rc_mag", "uniform", lim_lo=0, lim_hi=1),
+            # Parameter("rc_phi", "uniform", lim_lo=0, lim_hi=np.pi),
+            Parameter("rc_mag", "uniform", lim_lo=-10, lim_hi=-1),
+            Parameter("rc_phi", "uniform", lim_lo=-10, lim_hi=-1),
         ]
 
     def zpk_to_ba(self, pole,phi):
@@ -35,21 +26,15 @@ class ElectronicsModel2(ModelBaseClass):
 
     def apply_to_detector(self, params, detector):
         pmag, pphi, rc_mag, rc_phi  = params[:]
-        # pmag, pphi, rc_mag, rc_phi, zmag_h,zphi_h,zmag_l,zphi_l    = params[:]
 
-        # detector.SetTransferFunctionRC(rc1, rc2, rcfrac, digFrequency=1./self.timestep )
         detector.hp_num = [1,-2,1]
-        # detector.hp_num = self.zpk_to_ba(zmag_h, zphi_h)
-        detector.hp_den = self.zpk_to_ba(1. - 10.**rc_mag, np.pi * 10.**rc_phi)
-        # print(detector.hp_den)
+        # detector.hp_den = self.zpk_to_ba(rc_mag, rc_phi)
+        detector.hp_den = self.zpk_to_ba(1. - 10.**rc_mag, 10.**rc_phi)
 
-        dig = self.timestep
-        (__, detector.lp_den) = signal.zpk2tf([],
-                [ np.exp(dig*pmag * np.exp(pphi*1j)), np.exp(dig*pmag * np.exp(-pphi*1j))   ],1.)
+        detector.lp_den = self.zpk_to_ba(pmag, pphi)
         detector.lp_num = [1,2,1]
-        # detector.lp_num = self.zpk_to_ba(zmag_l, zphi_l)
 
-class ElectronicsModel(ModelBaseClass):
+class ElectronicsModel_old(ModelBaseClass):
     """
     Specify the model in Python.
     """

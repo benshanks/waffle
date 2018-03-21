@@ -13,6 +13,7 @@ class Parameter(object):
         if not (prior_type == "gaussian" or prior_type == "uniform"):
             raise ValueError("Parameter prior_type must be gaussian or uniform, not {}".format(prior_type))
 
+        self.name = name
         self.prior_type = prior_type
         self.mean = mean
         self.variance = variance
