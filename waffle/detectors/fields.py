@@ -10,23 +10,30 @@ from datetime import datetime
 from siggen import PPC
 
 def generate_fields(det_info, conf_name):
+    '''
+    Assume the measurements are within 50 percent of being right
+    Allow the max impurity at each end to go to 1.5x the measurements
+    and the min to go to 0
+    find the range of impurity avg and grad that would encompass
+    and generate the fields
+    '''
+
+
     det = PPC( conf_name, verbose=False, doInit=False)
 
     meshmult = 10
-    imp_uncertainty_factor = 2
+    imp_uncertainty_factor = 0.5
 
     #divide by 10 to go from 1E9 to 1E10
-    imp_max = np.amax((det_info["impurity_tail"], det_info["impurity_seed"]) ) / 10.
-    imp_min = np.amin((det_info["impurity_tail"], det_info["impurity_seed"]) ) / 10.
+    imp_max = -1*np.amax((det_info["impurity_tail"], det_info["impurity_seed"]) ) / 10.
+    imp_min = -1*np.amin((det_info["impurity_tail"], det_info["impurity_seed"]) ) / 10.
 
-    max_avg = np.round(-0.5*(imp_uncertainty_factor*imp_max + imp_uncertainty_factor*imp_min), 2)
-    min_avg = np.round(-0.5*(imp_max/imp_uncertainty_factor + imp_min/imp_uncertainty_factor),2)
+    min_avg =  np.around(  0.5*( (1+imp_uncertainty_factor)*imp_max + (1+imp_uncertainty_factor)*imp_min ), 2)
+    max_grad = np.around(   (-(1+imp_uncertainty_factor)*imp_max/(det.detector_length/10) ), 2)
+    min_grad = np.around(   ((1+imp_uncertainty_factor)*imp_min/(det.detector_length/10) ), 2)
 
-    max_grad = np.round((imp_uncertainty_factor*imp_max - imp_min/imp_uncertainty_factor)/(det_info["length"]/10),2)
-    min_grad = np.round((imp_max/imp_uncertainty_factor - imp_uncertainty_factor*imp_min)/(det_info["length"]/10),2)
-
-    impAvgRange = np.linspace(max_avg,min_avg, 5)
-    gradientRange = np.linspace(min_grad,max_grad, 5)
+    impAvgRange = np.linspace(min_avg, 0, num_avg)
+    gradientRange = np.linspace(min_grad,max_grad, num_grad)
 
     print(impAvgRange)
     print(gradientRange)
