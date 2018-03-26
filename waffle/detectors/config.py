@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 
 
-def create_conf_file(detector_name, output_name):
+def create_conf_file(detector_name, output_name, uncert=0.5):
 
     if detector_name[0].lower() == "b": #BEGE
         siggen_dict = get_bege_detector_info(detector_name)
