@@ -18,7 +18,7 @@ from scipy import signal
 from pysiggen import Detector
 
 from waffle.management import FitConfiguration
-from waffle.models import Model
+from waffle.models import Model, ElectronicsModel
 
 colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown", "deeppink", "goldenrod", "lightsteelblue", "maroon", "violet", "lawngreen", "grey", "chocolate" ]
 
@@ -124,3 +124,42 @@ class ResultPlotter():
         plt.xlabel("Sample number [10s of ns]")
         plt.ylabel("Average residual [adc]")
         plt.savefig("average_residual.pdf")
+
+    def plot_tf(self):
+        freq_samp = 1E9
+        nyq_freq = 0.5*freq_samp
+
+        em = ElectronicsModel()
+
+        tf_data = self.plot_data.iloc[:, self.model.tf_first_idx: self.model.tf_first_idx + em.get_num_params()]
+
+        f, ax = plt.subplots(1,2, figsize=(12,6))
+
+        pmag = tf_data.iloc[:,0].as_matrix()
+        pphi = tf_data.iloc[:,1].as_matrix()
+        lp_zeromag = tf_data.iloc[:,4].as_matrix()
+        lp_zerophi = tf_data.iloc[:,5].as_matrix()
+
+        pole = pmag * np.exp(1j*pphi)
+        zero = lp_zeromag * np.exp(1j*lp_zerophi)
+
+        ax[0].scatter(np.real(pole), np.imag(pole), c="b", alpha=0.3)
+        ax[0].scatter(np.real(zero), np.imag(zero), c="r", alpha=0.3)
+        an = np.linspace(0,np.pi,200)
+        ax[0].plot(np.cos(an), np.sin(an), c="k")
+        ax[0].axis("equal")
+
+        p = None
+        for i, row in tf_data.iterrows():
+            pmag, pphi, rc_mag, rc_phi, lp_zeromag, lp_zerophi = row.as_matrix()
+            num = em.zpk_to_ba(lp_zeromag, lp_zerophi)
+            den = em.zpk_to_ba(pmag, pphi)
+
+            num /= (np.sum(num)/np.sum(den))
+
+            w, h = signal.freqz(num, den, worN=np.logspace(-10, 0, 500, base=np.pi), )
+            w/= (np.pi /nyq_freq)
+            if p is None:
+                p = ax[1].loglog( w, np.abs(h), alpha = 0.2)
+            else:
+                ax[1].loglog( w, np.abs(h), c=p[0].get_color(), alpha = 0.2)

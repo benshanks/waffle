@@ -34,8 +34,8 @@ class Model(object):
         self.changed_wfs = np.zeros(self.num_waveforms)
 
         #Set up all the models...
-        self.electronics_model = ElectronicsModel()
-        self.velo_model = VelocityModel(include_beta=False)
+        self.electronics_model = ElectronicsModel(include_zeros=self.conf.fit_zeros)
+        self.velo_model = VelocityModel(include_beta=self.conf.fit_beta)
         self.imp_model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length)
 
         self.tf_first_idx = 0
@@ -379,10 +379,9 @@ class Model(object):
         return ln_like
 
     def make_waveform(self, data_len, wf_params, charge_type=None):
-        self.electronics_model.apply_to_detector(wf_params[self.tf_first_idx: self.velo_first_idx], self.detector)
-        self.velo_model.apply_to_detector(wf_params[self.velo_first_idx: self.imp_first_idx], self.detector)
-
         try:
+            self.electronics_model.apply_to_detector(wf_params[self.tf_first_idx: self.velo_first_idx], self.detector)
+            self.velo_model.apply_to_detector(wf_params[self.velo_first_idx: self.imp_first_idx], self.detector)
             self.imp_model.apply_to_detector(wf_params[self.imp_first_idx: self.num_det_params], self.detector)
         except ValueError:
             return None

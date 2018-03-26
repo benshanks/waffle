@@ -5,12 +5,56 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-def get_detector_info(detector_name):
+
+def create_conf_file(detector_name, output_name):
+
+    if detector_name[0].lower() == "b": #BEGE
+        siggen_dict = get_bege_detector_info(detector_name)
+
+        imp_min, imp_max = -2, -5
+
+    elif detector_name[0].lower() == "p": #ORTEC
+        det_info = get_detector_info(detector_name)
+        siggen_dict = detector_info_to_conf_file(det_info)
+
+        #divide by 10 to go from 1E9 to 1E10
+        imp_max = -(1+uncert)*np.amax((det_info["impurity_tail"], det_info["impurity_seed"]) ) / 10.
+        imp_min = -(1+uncert)*np.amin((det_info["impurity_tail"], det_info["impurity_seed"]) ) / 10.
+
+    else:
+        raise ValueError("Unknown detector type for name {}".format(detector_name))
+
+    with open(output_name, 'w') as conf_file:
+        conf_file.write("# Auto-generated for {} from waffle at {}".format(detector_name, datetime.now()))
+
+        for section_name, section_dict in siggen_dict.items():
+            conf_file.write("\n[{}]\n".format(section_name))
+            for k, v in section_dict.items():
+                conf_file.write(format_conf_line(k,v))
+
+    return imp_min, imp_max
+
+def get_bege_detector_info(detector_name):
+    bege_file_name = "beges.csv"
+
+    cols = [0,3]
+    col_names = ["detector_id", "operating_v"]
+
+    df = pd.read_csv(bege_file_name, usecols=cols, names=col_names, index_col=0, skiprows=2)
+
+    siggen_dict = get_bege_siggen_default(detector_name)
+    siggen_dict["detector"]["xtal_HV"] = df.loc[int(detector_name[1:])]["operating_v"]
+
+    return siggen_dict
+
+
+
+
+def get_ortec_detector_info(detector_name):
 
     ortec_file_name = "ortec_ORTEC_Measurements.csv"
     starret_file_name = "ortec_starret_measurements.csv"
     contact_file_name = "ortec_starret_contacts.csv"
-
 
     ortec_cols = [0,1,2,6, 8,9,10,11,12,13,14]
     ortec_col_names = ["detector_id", "diameter", "length", "mass", "pc_diameter",
@@ -50,7 +94,6 @@ def get_detector_info(detector_name):
 
     return detector_info
 
-
 def detector_info_to_conf_file(detector_info, output_name):
 
     #convert this all to siggen-style
@@ -62,23 +105,12 @@ def detector_info_to_conf_file(detector_info, output_name):
 
     siggen_dict["detector"]["xtal_HV"] = detector_info["operating_v"]
 
-    def format_conf_line(field_name, field_value):
-        return "{:30}{}\n".format(field_name, field_value)
-
-    with open(output_name, 'w') as conf_file:
-        conf_file.write("# Auto-generated for {} from waffle at {}".format(detector_info.name, datetime.now()))
-
-        for section_name, section_dict in siggen_dict.items():
-            conf_file.write("\n[{}]\n".format(section_name))
-            for k, v in section_dict.items():
-                conf_file.write(format_conf_line(k,v))
+    return siggen_dict
 
 def get_ortec_siggen_default(detector_name):
-    return {
-        "general":{
-        "verbosity_level":0
-        },
-        "geometry":{
+    sig_dic = get_siggen_default(detector_name)
+
+    sig_dic["geometry"]= {
         "top_bullet_radius":    1.2,
         "bottom_bullet_radius": 0,
         "bulletize_PC":    1,
@@ -86,6 +118,30 @@ def get_ortec_siggen_default(detector_name):
         "wrap_around_radius":0,
         "ditch_depth":0,
         "ditch_thickness":0
+        }
+
+def get_bege_siggen_default(detector_name):
+    sig_dic = get_siggen_default(detector_name)
+
+    sig_dic["geometry"]= {
+        "xtal_length": 30.,
+        "xtal_radius": 35.,
+        "top_bullet_radius":    1.2,
+        "bottom_bullet_radius": 1.2,
+        "bulletize_PC":    0,
+        "pc_length": 0.1,
+        "pc_radius": 2.0,
+        "taper_length": 0,
+        "wrap_around_radius":11.1,
+        "ditch_depth":2,
+        "ditch_thickness":6.35
+        }
+    return sig_dic
+
+def get_siggen_default(detector_name):
+    return {
+        "general":{
+        "verbosity_level":0
         },
         "detector":{
         "field_name": "../fields/{}_ev.field".format(detector_name),
@@ -97,3 +153,6 @@ def get_ortec_siggen_default(detector_name):
         "step_time_out":1.0,
         }
         }
+
+def format_conf_line(field_name, field_value):
+    return "{:30}{}\n".format(field_name, field_value)

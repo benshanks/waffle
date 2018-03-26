@@ -31,8 +31,8 @@ class ImpurityModelEnds(ModelBaseClass):
         self.imp_avg_lims = imp_avg_lims
         self.imp_grad_lims = imp_grad_lims
 
-        imp_max = np.around(-1 * imp_grad_lims[-1] * ((detector_length/10)),0.2)
-        imp_min = np.around(1 * imp_grad_lims[0] * ((detector_length/10)), 0.2)
+        imp_max = np.ceil(-1 * imp_grad_lims[-1] * ((detector_length/10)) *100)/100
+        imp_min = np.ceil(1 * imp_grad_lims[0] * ((detector_length/10)) *100)/100
 
         self.params = [
             Parameter("imp_z0", "uniform", lim_lo=imp_max, lim_hi=0),

@@ -82,47 +82,39 @@ class LocalFitManager():
 class FitConfiguration(object):
     def __init__(self,
         #data files
-        wf_file_name="", field_file_name="",  conf_file="",
+        wf_file_name="", conf_file="",
         wf_idxs=None,
         #save path
         directory = "",
         #params for setting up & aligning waveforms
         align_idx = 200,
         num_samples = 400,
-        fallPercentage = 0.97,
         alignType = "max",
+        fit_beta = False,
+        fit_zeros=False,
         loadSavedConfig=False,
-        avg_imp_guess = None,
-        imp_grad_guess = None,
         beta_lims = [0.1, 1],
         interpType = "linear",
-        energy_guess = 6430,
-        smooth_type = "gen_gaus",
         time_step_calc=1#ns
     ):
 
         self.wf_file_name=wf_file_name
-        self.field_file_name=field_file_name
         self.siggen_conf_file=conf_file
 
         self.directory = directory
 
         self.wf_idxs = wf_idxs
         self.align_idx = align_idx
-        self.fallPercentage = fallPercentage
-        self.doMaxInterp = True
+
+        self.fit_beta = fit_beta
+        self.fit_zeros = fit_zeros
 
         #velocity model reference point field
         self.E_a = 500
         self.E_lo = 250
         self.E_hi = 1000
 
-        self.energy_guess = energy_guess
-
         self.num_wf_params = 6
-
-        self.interp_type = interpType
-        self.smooth_type = smooth_type
 
         if not (alignType == "max" or alignType == "timepoint"):
             print ("alignType must be 'max' or 'timepoint', not {0}".format(alignType))
@@ -132,8 +124,6 @@ class FitConfiguration(object):
         self.num_samples = num_samples
 
         #limits & priors for the actual fit
-        self.avg_imp_guess = avg_imp_guess
-        self.imp_grad_guess = imp_grad_guess
         self.traprc_min = 150
         self.beta_lims = beta_lims
 
@@ -153,3 +143,17 @@ class FitConfiguration(object):
             exit()
 
         self.__dict__.update(pickle.load(open(saved_file, 'rb')))
+
+    def plot_training_set(self):
+        import matplotlib.pyplot as plt
+
+        if os.path.isfile(self.wf_file_name):
+            print("Loading wf file {0}".format(self.wf_file_name))
+            data = np.load(self.wf_file_name, encoding="latin1")
+            wfs = data['wfs']
+            wfs = wfs[self.wf_idxs]
+
+            plt.figure()
+            for wf in wfs:
+                plt.plot(wf.data)
+            plt.show()

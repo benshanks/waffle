@@ -8,31 +8,50 @@ class ElectronicsModel(ModelBaseClass):
     """
     2-pole digital filter for both HP and LP halves
     """
-    def __init__(self,timestep=1E-9):
-        self.num_params = 4
+    def __init__(self,timestep=1E-9, include_zeros=True):
+        self.include_zeros = include_zeros
         self.timestep=timestep
 
         self.params = [
-            Parameter("pole_mag", "uniform", lim_lo=0, lim_hi=1),
-            Parameter("pole_phi", "uniform", lim_lo=0, lim_hi=np.pi),
+            #I know from experience that the lowpass poles are near (0,1)
+            #(makes sense cause the amplitude response should fall off near nyquist freq)
+            #just go ahead and shove the priors up near there
+            Parameter("pole_mag", "uniform", lim_lo=0.9, lim_hi=1),
+            Parameter("pole_phi", "uniform", lim_lo=0, lim_hi=0.1),
             # Parameter("rc_mag", "uniform", lim_lo=0, lim_hi=1),
             # Parameter("rc_phi", "uniform", lim_lo=0, lim_hi=np.pi),
             Parameter("rc_mag", "uniform", lim_lo=-10, lim_hi=-1),
             Parameter("rc_phi", "uniform", lim_lo=-10, lim_hi=-1),
         ]
 
+        if include_zeros:
+            self.params.append(
+                Parameter("lp_zeromag", "uniform", lim_lo=0, lim_hi=10))
+            self.params.append(
+                Parameter("lp_zerophi", "uniform", lim_lo=0, lim_hi=np.pi))
+
+        self.num_params = len(self.params)
+
+
     def zpk_to_ba(self, pole,phi):
         return [1, -2*pole*np.cos(phi), pole**2]
 
     def apply_to_detector(self, params, detector):
-        pmag, pphi, rc_mag, rc_phi  = params[:]
+        if self.include_zeros:
+            pmag, pphi, rc_mag, rc_phi, lp_zeromag, lp_zerophi   = params[:]
+            detector.lp_num = self.zpk_to_ba(lp_zeromag, lp_zerophi)
+            if np.sum(detector.lp_num) == 0:
+                raise ValueError("Zero sum low pass denominator!")
+        else:
+            pmag, pphi, rc_mag, rc_phi   = params[:]
+            detector.lp_num = [1,2,1]
+
+        detector.lp_den = self.zpk_to_ba(pmag, pphi)
 
         detector.hp_num = [1,-2,1]
         # detector.hp_den = self.zpk_to_ba(rc_mag, rc_phi)
         detector.hp_den = self.zpk_to_ba(1. - 10.**rc_mag, 10.**rc_phi)
 
-        detector.lp_den = self.zpk_to_ba(pmag, pphi)
-        detector.lp_num = [1,2,1]
 
 class ElectronicsModel_old(ModelBaseClass):
     """
