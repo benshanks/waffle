@@ -72,7 +72,17 @@ class Model(object):
         baselineLengths = np.zeros(wfs.size)
 
         for (wf_idx,wf) in enumerate(wfs):
-          wf.window_waveform(time_point=self.conf.align_percent, early_samples=self.conf.align_idx, num_samples=self.conf.num_samples)
+          total_samples = self.conf.num_samples
+          full_samples = self.conf.align_idx
+          wf.window_waveform(time_point=self.conf.align_percent, early_samples=self.conf.align_idx, num_samples=total_samples)
+
+        #   dec_idx = 150
+        #   dec_factor = 20
+        #   dec_samples = dec_factor*(total_samples-dec_idx)
+          #
+        #   wf.window_waveform(time_point=self.conf.align_percent, early_samples=self.conf.align_idx, num_samples=dec_idx+dec_samples)
+        #   wf.windowed_wf = np.concatenate((wf.windowed_wf[:dec_idx], wf.windowed_wf[dec_idx::dec_factor]))
+        #   wf.window_length = len(wf.windowed_wf)
 
           if doPrint:
               print( "wf %d length %d (entry %d from run %d)" % (wf_idx, wf.window_length, wf.entry_number, wf.runNumber))
@@ -85,7 +95,6 @@ class Model(object):
 
         if doPrint:
             print( "siggen_wf_length will be %d, output wf length will be %d" % (self.siggen_wf_length, self.output_wf_length))
-
 
     def draw_position(self, wf_idx):
       r = rng.rand() * self.detector.detector_radius
@@ -417,6 +426,9 @@ class Model(object):
 
         if model is None or np.any(np.isnan(model)):
             return None
+
+        # if self.conf.decimate_decay_idx is not None:
+        #     model = np.concatenate(( model[:decimate_decay_idx], model[decimate_decay_idx::dec_factor]))
 
         return model
 
