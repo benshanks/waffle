@@ -8,9 +8,8 @@ class ElectronicsModel(ModelBaseClass):
     """
     2-pole digital filter for both HP and LP halves
     """
-    def __init__(self,timestep=1E-9, include_zeros=True):
+    def __init__(self,include_zeros=True):
         self.include_zeros = include_zeros
-        self.timestep=timestep
 
         self.params = [
             #I know from experience that the lowpass poles are near (0,1)
@@ -31,7 +30,6 @@ class ElectronicsModel(ModelBaseClass):
                 Parameter("lp_zerophi", "uniform", lim_lo=0, lim_hi=np.pi))
 
         self.num_params = len(self.params)
-
 
     def zpk_to_ba(self, pole,phi):
         return [1, -2*pole*np.cos(phi), pole**2]
