@@ -31,12 +31,12 @@ class ImpurityModelEnds(ModelBaseClass):
         self.imp_avg_lims = imp_avg_lims
         self.imp_grad_lims = imp_grad_lims
 
-        imp_max = np.ceil(-1 * imp_grad_lims[-1] * ((detector_length/10)) *100)/100
-        imp_min = np.ceil(1 * imp_grad_lims[0] * ((detector_length/10)) *100)/100
+        self.imp_max = np.ceil(-1 * imp_grad_lims[-1] * ((detector_length/10)) *100)/100
+        self.imp_min = np.ceil(1 * imp_grad_lims[0] * ((detector_length/10)) *100)/100
 
         self.params = [
-            Parameter("imp_z0", "uniform", lim_lo=imp_max, lim_hi=0),
-            Parameter("imp_zmax", "uniform", lim_lo=imp_min, lim_hi=0)
+            Parameter("imp_z0", "uniform", lim_lo=self.imp_max, lim_hi=0),
+            Parameter("imp_zmax", "uniform", lim_lo=self.imp_min, lim_hi=0)
         ]
 
     def apply_to_detector(self, params, detector):
