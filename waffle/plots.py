@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from matplotlib.colors import LogNorm
 
+import seaborn as sns
 import corner
 
 import pandas as pd
@@ -41,15 +42,18 @@ class ResultPlotter():
         num_samples = len(data.index)
         print( "found %d samples... " % num_samples,)
 
-        if num_samples > plotNum: num_samples = plotNum
-        print( "plotting %d samples" % num_samples)
-
-        end_idx = len(data.index) - 1
-        # end_idx = 10000
-
-        self.plot_data = data.iloc[(end_idx - num_samples):end_idx]
+        if plotNum == -1:
+            self.plot_data = data
+        elif num_samples > plotNum:
+            num_samples = plotNum
+            end_idx = len(data.index) - 1
+            self.plot_data = data.iloc[(end_idx - num_samples):end_idx]
 
         self.num_wf_params = np.int(  (len(data.columns) - self.model.num_det_params) / self.model.num_waveforms )
+        print( "plotting %d samples" % num_samples)
+
+
+        # end_idx = 10000
 
     def plot_waveforms(self, wf_to_plot=None):
         data = self.plot_data
@@ -83,7 +87,7 @@ class ResultPlotter():
             wfs_param_arr = params[num_det_params:].reshape((self.num_wf_params, model.num_waveforms))
             wf_params[:num_det_params] = params[:num_det_params]
             # print(wf_params[:num_det_params])
-            print("imp:{}, grad: {}".format(wf_params[num_det_params-1], wf_params[num_det_params-2]))
+            # print("imp:{}, grad: {}".format(wf_params[num_det_params-1], wf_params[num_det_params-2]))
 
             for (wf_idx,wf) in enumerate(model.wfs):
                 # if wf_idx < 4: continue
@@ -129,7 +133,7 @@ class ResultPlotter():
         freq_samp = 1E9
         nyq_freq = 0.5*freq_samp
 
-        em = ElectronicsModel()
+        em = self.model.electronics_model
 
         tf_data = self.plot_data.iloc[:, self.model.tf_first_idx: self.model.tf_first_idx + em.get_num_params()]
 
@@ -137,29 +141,95 @@ class ResultPlotter():
 
         pmag = tf_data.iloc[:,0].as_matrix()
         pphi = tf_data.iloc[:,1].as_matrix()
-        lp_zeromag = tf_data.iloc[:,4].as_matrix()
-        lp_zerophi = tf_data.iloc[:,5].as_matrix()
-
         pole = pmag * np.exp(1j*pphi)
-        zero = lp_zeromag * np.exp(1j*lp_zerophi)
-
         ax[0].scatter(np.real(pole), np.imag(pole), c="b", alpha=0.3)
-        ax[0].scatter(np.real(zero), np.imag(zero), c="r", alpha=0.3)
+
+        rc_mag = tf_data.iloc[:,2].as_matrix()
+        rc_phi = tf_data.iloc[:,3].as_matrix()
+        rc_mag = 1. - 10.**rc_mag
+        rc_phi = 10.**rc_phi
+        pole = rc_mag * np.exp(1j*rc_phi)
+        ax[0].scatter(np.real(pole), np.imag(pole), c="g", alpha=0.3)
+
+        if em.get_num_params() == 6:
+            lp_zeromag = tf_data.iloc[:,4].as_matrix()
+            lp_zerophi = tf_data.iloc[:,5].as_matrix()
+            zero = lp_zeromag * np.exp(1j*lp_zerophi)
+            ax[0].scatter(np.real(zero), np.imag(zero), c="r", alpha=0.3)
+
         an = np.linspace(0,np.pi,200)
         ax[0].plot(np.cos(an), np.sin(an), c="k")
         ax[0].axis("equal")
 
         p = None
         for i, row in tf_data.iterrows():
-            pmag, pphi, rc_mag, rc_phi, lp_zeromag, lp_zerophi = row.as_matrix()
-            num = em.zpk_to_ba(lp_zeromag, lp_zerophi)
+            if em.get_num_params() == 6:
+                pmag, pphi, rc_mag, rc_phi, lp_zeromag, lp_zerophi = row.as_matrix()
+                num = em.zpk_to_ba(lp_zeromag, lp_zerophi)
+            else:
+                pmag, pphi, rc_mag, rc_phi = row.as_matrix()
+                num = [1,2,1]
+
             den = em.zpk_to_ba(pmag, pphi)
-
             num /= (np.sum(num)/np.sum(den))
-
-            w, h = signal.freqz(num, den, worN=np.logspace(-10, 0, 500, base=np.pi), )
+            w, h = signal.freqz(num, den, worN=np.logspace(-13, 0, 500, base=np.pi), )
             w/= (np.pi /nyq_freq)
+
+            den = em.zpk_to_ba(1. - 10.**rc_mag, 10.**rc_phi)
+            num = [1,-2,1]
+            w_rc, h_rc = signal.freqz(num, den, worN=np.logspace(-13, 0, 500, base=np.pi), )
+            w_rc/= (np.pi /nyq_freq)
+
             if p is None:
                 p = ax[1].loglog( w, np.abs(h), alpha = 0.2)
+                p2 = ax[1].loglog( w_rc, np.abs(h_rc), alpha = 0.2)
             else:
                 ax[1].loglog( w, np.abs(h), c=p[0].get_color(), alpha = 0.2)
+                ax[1].loglog( w_rc, np.abs(h_rc), c=p2[0].get_color(), alpha = 0.2)
+
+    def plot_imp(self):
+        im = self.model.imp_model
+        imp_data = self.plot_data.iloc[:, self.model.imp_first_idx: self.model.imp_first_idx + im.get_num_params()]
+
+        imp_z0 = imp_data.iloc[:,0].as_matrix()
+        imp_zmax = imp_data.iloc[:,1].as_matrix()
+
+        g = sns.jointplot(x=imp_z0, y=imp_zmax, kind="kde", stat_func=None)
+
+        avgs = self.model.detector.imp_avg_points
+        grads = self.model.detector.imp_grad_points
+
+        # plt.figure()
+
+        for avg in avgs:
+            y1 = 2*avg - im.imp_max
+            y2 = 2*avg - 0
+            g.ax_joint.plot((im.imp_max, 0), (y1, y2), c="k", ls="--")
+        for grad in grads:
+            y1 = (grad*self.model.detector.detector_length/10) + im.imp_max
+            y2 = (grad*self.model.detector.detector_length/10) + 0
+
+            g.ax_joint.plot((im.imp_max, 0), (y1, y2), c="k", ls="--")
+
+        g.ax_joint.set_xlim(im.imp_max, 0)
+        g.ax_joint.set_ylim(im.imp_min, 0)
+
+        #overlay the grid of calculated points
+
+    def plot_trace(self):
+        f, ax = plt.subplots(self.model.num_det_params, 1, figsize=(14,10), sharex=True)
+        for i in range(self.model.num_det_params):
+            tf_data = self.plot_data[i]
+            ax[i].plot(tf_data)
+        plt.xlim(0, len(tf_data))
+
+    def plot_detector_pair(self):
+        g = sns.pairplot(self.plot_data.iloc[:, :self.model.num_det_params], diag_kind="kde")
+        plt.savefig("pairplot.png")
+
+    def plot_waveform_trace(self):
+        f, ax = plt.subplots(self.num_wf_params, 1, figsize=(14,10), sharex=True)
+        for i in range(self.num_wf_params):
+            for j in range (self.model.num_waveforms):
+                tf_data = self.plot_data[self.model.num_det_params + self.model.num_waveforms*i+j]
+                ax[i].plot(tf_data, color=colors[j])
