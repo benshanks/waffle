@@ -16,7 +16,7 @@ class WaveformModel(ModelBaseClass):
     """
     Specify the model in Python.
     """
-    def __init__(self, target_wf, align_percent, detector):
+    def __init__(self, target_wf, align_percent, detector, align_idx=125):
 
         self.detector = detector
         self.num_params = 6
@@ -24,7 +24,7 @@ class WaveformModel(ModelBaseClass):
         self.align_percent = align_percent
 
         self.align_sigma = 1
-        self.align_idx = 125
+        self.align_idx = align_idx
 
         smooth_guess = 20
 
@@ -46,15 +46,28 @@ class WaveformModel(ModelBaseClass):
       else:
         return (r,z)
 
-    def perturb(self, params, which):
+    def perturb(self, params):
+        logH = 0
+
+        reps = 1
+        if rng.rand() < 0.5:
+            reps += np.int(np.power(100.0, rng.rand()));
+
+        for i in range(reps):
+            which = rng.randint(self.num_params)
+            logH += self.perturb_param(params, which)
+        return logH
+
+    def perturb_param(self, params, which):
         #we need to treat (r,z) special.  anything else, just let it roll like normal.
         logh = super().perturb(params, which)
         if which <2:
             r=params[0]
             z=params[1]
             if not self.detector.IsInDetector(r, 0.1, z):
-                return self.perturb(params, which)
+                return self.perturb_param(params, which)
         return logh
+
 
     def get_prior(self):
         prior = super().get_prior()
@@ -112,6 +125,11 @@ class WaveformModel(ModelBaseClass):
             ln_like = -0.5*(np.sum((data-model)**2*inv_sigma2 - np.log(inv_sigma2)))
 
         return ln_like
+
+    def log_likelihood(self, params):
+        return self.calc_likelihood(params)
+    def from_prior(self):
+        return self.get_prior()
 
     # def get_new_rad(self,rad, theta):
     #       detector = self.detector

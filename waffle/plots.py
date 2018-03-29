@@ -22,15 +22,10 @@ from waffle.models import Model, ElectronicsModel
 colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown", "deeppink", "goldenrod", "lightsteelblue", "maroon", "violet", "lawngreen", "grey", "chocolate" ]
 
 
-class ResultPlotter():
+class PlotterBase():
     def __init__(self, result_directory, num_samples):
-        self.result_directory = result_directory
-
-        configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
-        self.model = Model(configuration)
-
         self.parse_samples("sample.txt", result_directory, num_samples)
-
+        print( "plotting %d samples" % num_samples)
 
     def parse_samples(self, sample_file_name, directory, plotNum):
 
@@ -47,13 +42,20 @@ class ResultPlotter():
             end_idx = len(data.index) - 1
             self.plot_data = data.iloc[(end_idx - num_samples):end_idx]
 
-        self.num_wf_params = np.int(  (len(data.columns) - self.model.num_det_params) / self.model.num_waveforms )
-        print( "plotting %d samples" % num_samples)
+class TrainingPlotter(PlotterBase):
+    def __init__(self, result_directory, num_samples):
+        super().__init__(result_directory, num_samples)
 
+        configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
+        self.model = Model(configuration)
+        self.num_wf_params = self.model.num_wf_params
+
+
+        self.parse_samples("sample.txt", result_directory, num_samples)
 
         # end_idx = 10000
 
-    def plot_waveforms(self, wf_to_plot=None):
+    def plot_waveforms(self, wf_to_plot=None, print_det_params=False):
         data = self.plot_data
         model = self.model
 
@@ -79,6 +81,7 @@ class ResultPlotter():
 
         for (idx) in range(len(data.index)):
             params = data.iloc[idx].as_matrix()
+            if print_det_params: print(params[:self.model.num_det_params])
 
             self.model.apply_detector_params(params)
 
@@ -226,3 +229,57 @@ class ResultPlotter():
             for j in range (self.model.num_waveforms):
                 tf_data = self.plot_data[self.model.num_det_params + self.model.num_waveforms*i+j]
                 ax[i].plot(tf_data, color=colors[j])
+
+
+class WaveformFitPlotter(PlotterBase):
+
+    def __init__(self, result_directory, num_samples, wf_model):
+        super().__init__(result_directory, num_samples)
+
+        self.wf_model = wf_model
+
+    def plot_trace(self):
+        f, ax = plt.subplots(self.wf_model.num_params, 1, figsize=(14,10), sharex=True)
+        for i in range(self.wf_model.num_params):
+            tf_data = self.plot_data[i]
+            ax[i].plot(tf_data)
+
+    def plot_waveform(self):
+        data = self.plot_data
+        wf_model = self.wf_model
+        wf = wf_model.target_wf
+        wf_idx = 0
+
+        plt.figure(figsize=(20,8))
+        gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
+        ax0 = plt.subplot(gs[0])
+        ax1 = plt.subplot(gs[1], sharex=ax0)
+        ax1.set_xlabel("Digitizer Time [ns]")
+        ax0.set_ylabel("Voltage [Arb.]")
+        ax1.set_ylabel("Residual")
+
+
+        dataLen = wf.window_length
+        t_data = np.arange(dataLen) * 10
+        ax0.plot(t_data, wf.windowed_wf, color=colors[wf_idx], ls = ":")
+        print ("wf %d max %d" % (wf_idx, np.amax(wf.windowed_wf)))
+
+        for (idx) in range(len(data.index)):
+            wf_params = data.iloc[idx].as_matrix()
+
+            fit_wf = wf_model.make_waveform(wf.window_length,wf_params)
+            if fit_wf is None:
+                continue
+
+            t_data = np.arange(wf.window_length) * 10
+            color_idx = wf_idx % len(colors)
+            ax0.plot(t_data,fit_wf, color=colors[color_idx], alpha=0.1)
+
+            resid = fit_wf -  wf.windowed_wf
+            ax1.plot(t_data, resid, color=colors[color_idx],alpha=0.1,)# linestyle="steps")
+
+        ax0.set_ylim(-20, wf.amplitude*1.1)
+        ax0.axhline(y=0,color="black", ls=":")
+        # ax0.axvline(x=model.conf.align_idx*10,color="black", ls=":")
+        # ax1.axvline(x=model.conf.align_idx*10,color="black", ls=":")
+        # ax1.set_ylim(-bad_wf_thresh, bad_wf_thresh)

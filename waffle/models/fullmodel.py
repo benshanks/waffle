@@ -192,19 +192,7 @@ class Model(object):
 
 
     def perturb_wf(self, params, wf_idx, ):
-        logH = 0.0
-        num_waveforms = self.num_waveforms
-        detector = self.detector
-
-        wf_params = 6
-
-        reps = 1
-        if rng.rand() < 0.5:
-            reps += np.int(np.power(100.0, rng.rand()));
-
-        for i in range(reps):
-            wf_which = rng.randint(self.num_wf_params)
-            logH += self.wf_models[wf_idx].perturb(  params[self.num_det_params + wf_idx*self.num_wf_params: self.num_det_params + (wf_idx+1)*self.num_wf_params], wf_which )
+        logH = self.wf_models[wf_idx].perturb(  params[self.num_det_params + wf_idx*self.num_wf_params: self.num_det_params + (wf_idx+1)*self.num_wf_params])
 
         return logH
 
