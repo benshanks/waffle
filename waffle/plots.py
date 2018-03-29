@@ -9,14 +9,12 @@ from matplotlib import gridspec
 from matplotlib.colors import LogNorm
 
 import seaborn as sns
-import corner
+# import corner
 
 import pandas as pd
 import numpy as np
 import scipy
 from scipy import signal
-
-from pysiggen import Detector
 
 from waffle.management import FitConfiguration
 from waffle.models import Model, ElectronicsModel
@@ -70,8 +68,6 @@ class ResultPlotter():
         ax1.set_ylabel("Residual")
 
         num_det_params = model.num_det_params
-
-        wf_params = np.empty(num_det_params+self.num_wf_params)
         resid_arr = np.zeros(model.wfs[0].window_length)
 
 
@@ -84,17 +80,14 @@ class ResultPlotter():
         for (idx) in range(len(data.index)):
             params = data.iloc[idx].as_matrix()
 
-            wfs_param_arr = params[num_det_params:].reshape((self.num_wf_params, model.num_waveforms))
-            wf_params[:num_det_params] = params[:num_det_params]
-            # print(wf_params[:num_det_params])
-            # print("imp:{}, grad: {}".format(wf_params[num_det_params-1], wf_params[num_det_params-2]))
+            self.model.apply_detector_params(params)
 
             for (wf_idx,wf) in enumerate(model.wfs):
                 # if wf_idx < 4: continue
                 # wfs_param_arr[-1,wf_idx] = 1
-                wf_params[num_det_params:] = wfs_param_arr[:,wf_idx]
+                wf_params =  params[model.num_det_params + wf_idx*model.num_wf_params: model.num_det_params + (wf_idx+1)*self.num_wf_params]
 
-                fit_wf = model.make_waveform(wf.window_length,wf_params)
+                fit_wf = model.wf_models[wf_idx].make_waveform(wf.window_length,wf_params)
                 if fit_wf is None:
                     continue
 

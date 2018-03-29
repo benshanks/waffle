@@ -1,9 +1,9 @@
 import os, sys
 import numpy as np
 
-from ._parameterbase import ModelBaseClass, Parameter
+from ._parameterbase import JointModelBase, Parameter
 
-class ImpurityModel(ModelBaseClass):
+class ImpurityModel(JointModelBase):
     """
     Impurity average and gradient
     """
@@ -21,7 +21,7 @@ class ImpurityModel(ModelBaseClass):
         imp_avg, imp_grad  = params[:]
         detector.siggenInst.SetImpurityAvg(imp_avg, imp_grad)
 
-class ImpurityModelEnds(ModelBaseClass):
+class ImpurityModelEnds(JointModelBase):
     """
     Impurity at both ends of the detector
     """

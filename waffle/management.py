@@ -20,7 +20,7 @@ class LocalFitManager():
         self.model = Model( fit_configuration, fit_manager=self)
         self.num_waveforms = self.model.num_waveforms
         self.num_det_params = self.model.num_det_params
-        self.num_wf_params = 6#fit_configuration.num_wf_params
+        self.num_wf_params = self.model.num_wf_params#fit_configuration.num_wf_params
 
         if num_threads is None: num_threads = cpu_count()
 
@@ -35,19 +35,13 @@ class LocalFitManager():
 
     def calc_likelihood(self, params):
         num_det_params = self.num_det_params
-
-        wfs_param_arr = params[num_det_params:].reshape((self.num_wf_params, self.num_waveforms))
-        wf_params = np.zeros((num_det_params+self.num_wf_params,self.num_waveforms))
-
-        args = []
         lnlike = 0
-        #parallelized calculation
 
+        #parallelized calculation
         if self.num_threads > 1:
+            args = []
             for wf_idx in range(self.num_waveforms):
-                wf_params[:num_det_params,wf_idx] = params[:num_det_params]
-                wf_params[num_det_params:,wf_idx] = wfs_param_arr[:,wf_idx]
-                args.append( [wf_params[:,wf_idx], wf_idx])
+                args.append( [self.model.get_wf_params(params, wf_idx), wf_idx] )
                 # print ("shipping {0}: {1}".format(wf_idx, wf_params[num_det_params:, wf_idx]))
 
             results = self.pool.map(WaveformLogLikeStar, args)
@@ -56,9 +50,7 @@ class LocalFitManager():
                 lnlike += result
         else:
             for wf_idx in range(self.num_waveforms):
-                wf_params[:num_det_params,wf_idx] = params[:num_det_params]
-                wf_params[num_det_params:,wf_idx] = wfs_param_arr[:,wf_idx]
-                result = model.calc_wf_likelihood(wf_params[:,wf_idx], wf_idx)
+                result = model.calc_wf_likelihood(self.model.get_wf_params(params, wf_idx), wf_idx)
                 lnlike += result
             # print (result)
         return lnlike
@@ -113,8 +105,6 @@ class FitConfiguration(object):
         self.E_a = 500
         self.E_lo = 250
         self.E_hi = 1000
-
-        self.num_wf_params = 6
 
         if not (alignType == "max" or alignType == "timepoint"):
             print ("alignType must be 'max' or 'timepoint', not {0}".format(alignType))

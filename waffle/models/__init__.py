@@ -8,4 +8,6 @@ from .velocity import VelocityModel
 from .detector import ImpurityModel
 from .detector import ImpurityModelEnds
 
+from .waveform import WaveformModel
+
 from .fullmodel import Model

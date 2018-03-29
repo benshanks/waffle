@@ -78,6 +78,7 @@ class ModelBaseClass(ABC):
     def get_num_params(self):
         return len(self.params)
 
+class JointModelBase(ModelBaseClass):
     @abstractmethod
     def apply_to_detector(self, params, detector):
         pass

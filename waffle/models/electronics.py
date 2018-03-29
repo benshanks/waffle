@@ -2,9 +2,9 @@ import os, sys
 import numpy as np
 from scipy import signal
 
-from ._parameterbase import ModelBaseClass, Parameter
+from ._parameterbase import JointModelBase, Parameter
 
-class ElectronicsModel(ModelBaseClass):
+class ElectronicsModel(JointModelBase):
     """
     2-pole digital filter for both HP and LP halves
     """
@@ -51,7 +51,7 @@ class ElectronicsModel(ModelBaseClass):
         detector.hp_den = self.zpk_to_ba(1. - 10.**rc_mag, 10.**rc_phi)
 
 
-class ElectronicsModel_old(ModelBaseClass):
+class ElectronicsModel_old(JointModelBase):
     """
     Specify the model in Python.
     """
