@@ -8,8 +8,9 @@ class ElectronicsModel(JointModelBase):
     """
     2-pole digital filter for both HP and LP halves
     """
-    def __init__(self,include_zeros=True):
+    def __init__(self,include_zeros=True, order_number=2):
         self.include_zeros = include_zeros
+        self.order_number = order_number
 
         self.params = [
             #I know from experience that the lowpass poles are near (0,1)
@@ -29,6 +30,13 @@ class ElectronicsModel(JointModelBase):
             self.params.append(
                 Parameter("lp_zerophi", "uniform", lim_lo=0, lim_hi=np.pi))
 
+        if order_number == 4:
+            self.params.append(
+                Parameter("pole_mag2", "uniform", lim_lo=0, lim_hi=1))
+            self.params.append(    
+                Parameter("pole_phi2", "uniform", lim_lo=0, lim_hi=np.pi)
+                )
+
         self.num_params = len(self.params)
 
     def zpk_to_ba(self, pole,phi):
@@ -40,11 +48,19 @@ class ElectronicsModel(JointModelBase):
             detector.lp_num = self.zpk_to_ba(lp_zeromag, lp_zerophi)
             if np.sum(detector.lp_num) == 0:
                 raise ValueError("Zero sum low pass denominator!")
+            detector.lp_den = self.zpk_to_ba(pmag, pphi)
+
+        elif self.order_number == 4 :
+            pmag, pphi, rc_mag, rc_phi, pmag2, pphi2   = params[:]
+            den1 = self.zpk_to_ba(pmag, pphi)
+            den2 = self.zpk_to_ba(pmag2, pphi2)
+            detector.lp_num = [[1,2,1], [1,2,1]]
+            detector.lp_den = [den1, den2]
+            detector.lp_order = 4
         else:
             pmag, pphi, rc_mag, rc_phi   = params[:]
             detector.lp_num = [1,2,1]
-
-        detector.lp_den = self.zpk_to_ba(pmag, pphi)
+            detector.lp_den = self.zpk_to_ba(pmag, pphi)
 
         detector.hp_num = [1,-2,1]
         # detector.hp_den = self.zpk_to_ba(rc_mag, rc_phi)

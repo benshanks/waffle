@@ -15,6 +15,7 @@ class FitConfiguration(object):
         alignType = "max",
         fit_beta = False,
         fit_zeros=False,
+        lp_order=2,
         loadSavedConfig=False,
         beta_lims = [0.1, 1],
         interpType = "linear",
@@ -31,6 +32,7 @@ class FitConfiguration(object):
 
         self.fit_beta = fit_beta
         self.fit_zeros = fit_zeros
+        self.lp_order=lp_order
 
         #velocity model reference point field
         self.E_a = 500
