@@ -1,20 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-import sys, os, shutil
+import sys, os
 import matplotlib.pyplot as plt
 
-from waffle.plots import ResultPlotter
+from waffle.plots import TrainingPlotter
 
-def main():
+def main(dir_name, num_samples=2000, sample_dec=1 ):
+    plotter = TrainingPlotter(dir_name, int(num_samples), int(sample_dec))
 
-    directory = "8wf_626"
+    plotter.plot_waveforms(print_det_params=False)
+    # plotter.plot_waveform_components()
+    plotter.plot_tf()
+    # plotter.plot_imp()
+    #
+    # plotter.plot_detector_pair()
 
-    plotter = ResultPlotter(directory, 20)
+    plotter.plot_trace()
+    # plotter.plot_waveform_trace()
 
-    plotter.plot_waveforms()
     plt.show()
 
 
 if __name__=="__main__":
-    main()
+    main(*sys.argv[1:] )

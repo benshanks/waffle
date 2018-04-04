@@ -97,9 +97,9 @@ class WaveformModel(ModelBaseClass):
                 model = self.detector.MakeSimWaveform(r, phi, z, scale, maxt, self.align_percent, data_len, smoothing=smooth)
                 # model = self.detector.GetWaveform(r, phi, z, scale)
         elif charge_type == 1:
-            model = self.detector.MakeRawSiggenWaveform(r, phi, z,1)
+            model = self.detector.MakeWaveform(r, phi, z,1)[0,:]
         elif charge_type == -1:
-            model = self.detector.MakeRawSiggenWaveform(r, phi, z,-1)
+            model = self.detector.MakeWaveform(r, phi, z,-1)[0,:]
         else:
             raise ValueError("Not a valid charge type! {0}".format(charge_type))
 

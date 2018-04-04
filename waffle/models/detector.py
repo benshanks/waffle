@@ -42,3 +42,15 @@ class ImpurityModelEnds(JointModelBase):
     def apply_to_detector(self, params, detector):
         imp_z0, imp_zmax  = params[:]
         detector.siggenInst.SetImpurityEnds(imp_z0, imp_zmax )
+
+class TrappingModel(JointModelBase):
+    def __init__(self):
+        self.num_params = 1
+
+        self.params = [
+            Parameter("trap_c", "gaussian", 1000, 1000, lim_lo=0, lim_hi=5000)
+        ]
+
+    def apply_to_detector(self, params, detector):
+        trap_c  = params
+        detector.siggenInst.SetTrapping(trap_c)

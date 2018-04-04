@@ -55,7 +55,7 @@ class TrainingPlotter(PlotterBase):
 
         # end_idx = 10000
 
-    def plot_waveforms(self, wf_to_plot=None, print_det_params=False):
+    def plot_waveforms(self, print_det_params=False):
         data = self.plot_data
         model = self.model
 
@@ -110,6 +110,16 @@ class TrainingPlotter(PlotterBase):
                 resid_arr += resid
                 ax1.plot(t_data, resid, color=colors[color_idx],alpha=0.1,)# linestyle="steps")
 
+                # em_lo_idx = self.model.joint_models.name_map["LowPassFilterModel"]
+                # em_lo = self.model.joint_models.models[em_lo_idx]
+                # lo_data = params[em_lo.start_idx: em_lo.start_idx + em_lo.num_params]
+                # lo_pz = em_lo.get_pz(lo_data)
+                #
+                # if resid[130] > 0:
+                #     print ("over: {}".format(lo_pz))
+                # else:
+                #     print ("under: {}".format(lo_pz))
+
 
         ax0.set_ylim(-20, np.amax([wf.amplitude for wf in model.wfs])*1.1)
         ax0.axhline(y=0,color="black", ls=":")
@@ -124,6 +134,46 @@ class TrainingPlotter(PlotterBase):
         plt.xlabel("Sample number [10s of ns]")
         plt.ylabel("Average residual [adc]")
         plt.savefig("average_residual.pdf")
+
+    def plot_waveform_components(self):
+        data = self.plot_data
+        model = self.model
+
+        plt.figure(figsize=(20,8))
+        plt.xlabel("Digitizer Time [ns]")
+
+        num_det_params = model.num_det_params
+
+        # for wf_idx, wf in enumerate(model.wfs):
+        #   dataLen = wf.window_length
+        #   t_data = np.arange(dataLen) * 10
+        #   plt.plot(t_data, wf.windowed_wf / wf.amplitude, color=colors[wf_idx], ls = ":")
+        #   print ("wf %d max %d" % (wf_idx, np.amax(wf.windowed_wf)))
+
+        for (idx) in range(len(data.index)):
+            print("index {}".format(idx))
+            params = data.iloc[idx].as_matrix()
+            self.model.joint_models.apply_params(params)
+
+            for (wf_idx,wf) in enumerate(model.wfs):
+                # if wf_idx < 4: continue
+                # wfs_param_arr[-1,wf_idx] = 1
+
+                print("wf index {}".format(wf_idx), end="")
+                wf_params =  params[model.num_det_params + wf_idx*model.num_wf_params: model.num_det_params + (wf_idx+1)*self.num_wf_params]
+
+                h_wf = np.copy(model.wf_models[wf_idx].make_waveform(wf.window_length,wf_params, charge_type=1))
+                e_wf = np.copy(model.wf_models[wf_idx].make_waveform(wf.window_length,wf_params, charge_type=-1))
+
+                print(h_wf.shape)
+
+                t_data = np.arange(len(h_wf))
+                color_idx = wf_idx % len(colors)
+                plt.plot(t_data,h_wf, color=colors[color_idx],ls="steps", alpha=0.1)
+                plt.plot(t_data,e_wf, color=colors[color_idx], ls="steps", alpha=0.1)
+                # plt.plot(t_data,h_wf+e_wf, color=colors[color_idx], ls="--", alpha=0.1)
+
+        # plt.ylim(-0.05, 1.05)
 
     def plot_tf(self):
         em_hi_idx = self.model.joint_models.name_map["HiPassFilterModel"]
@@ -161,19 +211,21 @@ class TrainingPlotter(PlotterBase):
             w_hi = np.logspace(-15, -6, 500, base=np.pi)
             w_lo = np.logspace(-6, 0, 500, base=np.pi)
 
-            (w_hi, h,  h2) = em_hi.get_freqz(hi_data, w_hi)
-            (w_lo, h3, h4) = em_lo.get_freqz(lo_data, w_lo)
+            # (w_hi, h,  h2) = em_hi.get_freqz(hi_data, w_hi)
+            # (w_lo, h3, h4) = em_lo.get_freqz(lo_data, w_lo)
+            (w_hi, h) = em_hi.get_freqz(hi_data, w_hi)
+            (w_lo, h3) = em_lo.get_freqz(lo_data, w_lo)
 
             if p is None:
                 p = ax[1].loglog( w_hi, np.abs(h), alpha = 0.2)
-                p2 = ax[1].loglog( w_hi, np.abs(h2), alpha = 0.2)
+                # p2 = ax[1].loglog( w_hi, np.abs(h2), alpha = 0.2)
                 p3 = ax[2].loglog( w_lo, np.abs(h3), alpha = 0.2)
-                p4 = ax[2].loglog( w_lo, np.abs(h4), alpha = 0.2)
+                # p4 = ax[2].loglog( w_lo, np.abs(h4), alpha = 0.2)
             else:
                 ax[1].loglog( w_hi, np.abs(h), c=p[0].get_color(), alpha = 0.2)
-                ax[1].loglog( w_hi, np.abs(h2), c=p2[0].get_color(), alpha = 0.2)
+                # ax[1].loglog( w_hi, np.abs(h2), c=p2[0].get_color(), alpha = 0.2)
                 ax[2].loglog( w_lo, np.abs(h3), c=p3[0].get_color(), alpha = 0.2)
-                ax[2].loglog( w_lo, np.abs(h4), c=p4[0].get_color(), alpha = 0.2)
+                # ax[2].loglog( w_lo, np.abs(h4), c=p4[0].get_color(), alpha = 0.2)
 
 
         an = np.linspace(0,np.pi,200)

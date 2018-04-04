@@ -8,41 +8,76 @@ import dnest4
 
 from waffle.management import LocalFitManager, FitConfiguration
 
-def main():
+chan_dict = {
+600: "B8482",
+692: "B8474"
+}
 
-    directory = "8wf_600"
-    wf_file = "training_data/chan600_8wfs.npz"
-    conf_name = "bege.config"
-    # conf_name = "P42574A.config"
-    wf_idxs = np.arange(8)
+def main(doPlot=False):
 
-    if os.path.isdir(directory):
-        print("Directory {} already exists: exiting rather than over-writing")
-    else:
-        os.makedirs(directory)
+    # directory = "4wf_648_zero"
+    # wf_file = "training_data/chan648_8wfs.npz"
+    # conf_name = "P42664A.conf"
+
+    chan = 692
+    directory = "2wf_{}_trapzero".format(chan)
+
+    wf_file = "training_data/chan{}_8wfs.npz".format(chan)
+    conf_name = "{}.conf".format( chan_dict[chan] )
+
+    # wf_idxs = np.arange(0,8,2)
+    wf_idxs = [1,2]
+
+    # wf_file = "16wf_set_chan{}.npz".format(chan)
+    # wf_idxs = np.arange(0,16,4)
+    # wf_idxs = [1,4,8,12]
 
     datadir= os.environ['DATADIR']
     conf_file = datadir +"siggen/config_files/" + conf_name
-    field_file = None
+
+    wf_conf = {
+        "wf_file_name":wf_file,
+        "wf_idxs":wf_idxs,
+        "align_idx":125,
+        "num_samples":1000,
+    }
+
+    model_conf = {
+        "model_list": ["VelocityModel", "LowPassFilterModel", "HiPassFilterModel", "ImpurityModelEnds", "TrappingModel"],
+        "fit_beta":False,
+        "lp_order":2,
+        "hp_order":2,
+        "lp_zeros":True
+    }
 
     conf = FitConfiguration(
-        wf_file, field_file, conf_file, wf_idxs,
+        conf_file,
         directory = directory,
-        alignType="timepoint",
-        align_idx = 125,
-        num_samples = 250,
-        imp_grad_guess= 0.1,
-        avg_imp_guess= -0.408716,
-        interpType = "linear",
-        smooth_type = "gen_gaus",
-        time_step_calc=1
+        wf_conf=wf_conf,
+        model_conf=model_conf
     )
 
-    fm = LocalFitManager(conf, num_threads=4)
+    if doPlot:
+        import matplotlib.pyplot as plt
+        # conf.plot_training_set()
+        fm = LocalFitManager(conf, num_threads=1)
+        for wf in fm.model.wfs:
+            plt.plot(wf.windowed_wf)
+            print (wf.window_length)
+        plt.show()
+        exit()
+
+    if os.path.isdir(directory):
+        if len(os.listdir(directory)) >0:
+            raise OSError("Directory {} already exists: not gonna over-write it".format(directory))
+    else:
+        os.makedirs(directory)
+
+    fm = LocalFitManager(conf, num_threads=2)
 
     conf.save_config()
-    fm.fit(numLevels=1000, directory = directory,new_level_interval=10000, numParticles=3)
+    fm.fit(numLevels=1000, directory = directory,new_level_interval=5000, numParticles=3)
 
 
 if __name__=="__main__":
-    main()
+    main(*sys.argv[1:])

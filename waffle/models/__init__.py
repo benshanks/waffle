@@ -7,6 +7,7 @@ from .velocity import VelocityModel
 
 from .detector import ImpurityModel
 from .detector import ImpurityModelEnds
+from .detector import TrappingModel
 
 from .waveform import WaveformModel
 

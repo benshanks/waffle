@@ -53,9 +53,9 @@ class DigitalFilterBase(JointModelBase):
             "zeros":[]
         }
 
-        # if self.zeros:
-        #     zmag, zphi   = params[self.order:self.order+2]
-        #     return_dict["zeros"].append( zmag * np.exp(1j*zphi) )
+        if self.include_zeros:
+            zmag, zphi   = params[self.order:self.order+2]
+            return_dict["zeros"].append( zmag * np.exp(1j*zphi) )
 
         pmag, pphi = params[:2]
 
@@ -113,7 +113,7 @@ class LowPassFilterModel(DigitalFilterBase):
                 Parameter("pole_phi2", "uniform", lim_lo=0, lim_hi=0.1)
                 )
 
-        if include_zeros == 4:
+        if include_zeros:
             self.params.append(
                 Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
             self.params.append(

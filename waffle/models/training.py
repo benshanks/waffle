@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from pygama.waveform import Waveform
 from siggen import PPC
 
-from . import VelocityModel, LowPassFilterModel, HiPassFilterModel, ImpurityModel, ImpurityModelEnds, WaveformModel
+from . import VelocityModel, LowPassFilterModel, HiPassFilterModel, ImpurityModel, ImpurityModelEnds, WaveformModel, TrappingModel
 
 max_float = sys.float_info.max
 
@@ -46,6 +46,8 @@ class JointModelBundle(object):
             model = HiPassFilterModel(order=self.conf["hp_order"])
         elif model_name == "LowPassFilterModel":
             model = LowPassFilterModel(order=self.conf["lp_order"], include_zeros=self.conf["lp_zeros"])
+        elif model_name ==  "TrappingModel":
+            model = TrappingModel()
 
         self.models.append(model)
         return model
