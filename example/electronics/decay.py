@@ -12,72 +12,67 @@ from waffle.models.electronics import HiPassFilterModel
 
 em = HiPassFilterModel()
 
-def main():
-    # det = Detector("GEM", "config_files/ortec4b.config", verbose=False)
-    # det = PPC("conf/P42574A_imp.config")
-    det = PPC( os.path.join(os.environ["DATADIR"],  "siggen", "config_files", "bege.config"), wf_padding=100)
-    imp_avg = -2
-    imp_grad = 1.2
-    det.siggenInst.SetImpurityAvg(imp_avg, imp_grad)
+det = PPC( os.path.join(os.environ["DATADIR"],  "siggen", "config_files", "bege.config"), wf_padding=100)
+imp_avg = -2
+imp_grad = 1.2
+det.siggenInst.SetImpurityAvg(imp_avg, imp_grad)
 
+
+
+
+
+def main():
     plot_wfs(det)
 
 
 def plot_wfs(det):
-    phi = 1E-5
+    det.lp_order=2
 
-    mag = -5
-    mag = 1-10.**mag
-    phi = 1E-6
+    det.lp_num = [1,2,1]
+    det.lp_den = em.zpk_to_ba(0.975, 0.007)
 
-    wf = np.copy(det.GetWaveform(25,0,25))
+    det.hp_order = 2
 
-    f, ax = plt.subplots(1,2,figsize=(15,8))
+
+    mag = 1.-10.**-5.145
+    phi = np.pi**-13.3
+    det.hp_num = [1,-2,1]
+    det.hp_den = em.zpk_to_ba(mag, phi)
+
+    wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
+    wf_compare = np.copy(wf_proc)
+
+    f, ax = plt.subplots(2,2,figsize=(15,8))
+    ax[0,0].plot (wf_compare,  color="r")
+
 
     cmap = cm.get_cmap('viridis')
 
-    phis = np.logspace(-10, -5, 100)
+    phis = np.logspace(-15, -8, 100, base=np.pi)
     # phis = np.pi - phis
 
     w,h = get_freq_resp(mag, phi)
-    ax[1].loglog( w, h, color="r")
-    num, den = get_tf(mag, phi)
-    wf_proc1 = signal.lfilter(num, den, wf)
+    ax[0,1].loglog( w, h, color="r")
 
     for phi2 in phis:
-
         color = cmap( (phi2 - phis[0])/(phis[-1] - phis[0]) )
 
-        mag2= 1 - 10E-8
-        num2, den2 = get_tf(mag2, phi2)
+        det.hp_den = em.zpk_to_ba(mag, phi2)
+        wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
 
-        w,h2 = get_freq_resp(mag2, phi2)
-        ax[1].loglog( w, h2, color=color)
-
-        # continue
-
-
-        wf_proc = signal.lfilter(num2, den2, wf_proc1)
-        if wf_proc is None:
-            print(mag,phi)
+        try:
+            ax[0,0].plot (wf_proc, label="{}, {}".format(phi,mag), color=color)
+            ax[1,0].plot (wf_proc-wf_compare, label="{}, {}".format(phi,mag), color=color)
+        except TypeError:
             continue
 
-        ax[0].plot (wf_proc-wf_proc1, label="{}, {}".format(phi,mag), color=color)
-
-
+        w,h2 = get_freq_resp(mag, phi2)
+        ax[0,1].loglog( w, h2, color=color)
 
 
     # plt.legend()
     plt.show()
 
-
-
-def get_tf(pole_mag, pole_phi):
-
-    num = [1,-2,1]
-    den = em.zpk_to_ba(pole_mag, pole_phi)
-
-    return num, den
 
 def get_freq_resp(p_mag, p_phi):
     freq_samp = 1E9
