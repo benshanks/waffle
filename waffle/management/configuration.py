@@ -2,58 +2,56 @@ import numpy as np
 import sys, os
 import pickle
 
+class WaveformConfiguration(object):
+    def __init__(self,
+        #params for setting up & aligning waveforms
+        wf_file_name,
+        align_idx = 200,
+        num_samples = 400,
+        align_percent = 0.95,
+        wf_idxs=None
+    ):
+        self.wf_file_name=wf_file_name
+        self.align_idx = align_idx
+        self.align_percent = align_percent
+        self.num_samples = num_samples
+        self.wf_idxs = wf_idxs
+
+        #downsampling the decay portion
+
+
 class FitConfiguration(object):
     def __init__(self,
         #data files
-        wf_file_name="", conf_file="",
-        wf_idxs=None,
+        conf_file="",
+
         #save path
         directory = "",
-        #params for setting up & aligning waveforms
-        align_idx = 200,
-        num_samples = 400,
-        alignType = "max",
-        fit_beta = False,
-        fit_zeros=False,
-        lp_order=2,
+
+        #fit parameters
+        wf_conf={},
+        model_conf={},
+
         loadSavedConfig=False,
-        beta_lims = [0.1, 1],
-        interpType = "linear",
-        time_step_calc=1#ns
+
+        time_step_calc=1
+
     ):
 
-        self.wf_file_name=wf_file_name
         self.siggen_conf_file=conf_file
-
         self.directory = directory
 
-        self.wf_idxs = wf_idxs
-        self.align_idx = align_idx
+        self.wf_conf = wf_conf
 
-        self.fit_beta = fit_beta
-        self.fit_zeros = fit_zeros
-        self.lp_order=lp_order
+        self.model_conf=model_conf
 
-        #velocity model reference point field
-        self.E_a = 500
-        self.E_lo = 250
-        self.E_hi = 1000
+        self.time_step_calc=time_step_calc
 
-        if not (alignType == "max" or alignType == "timepoint"):
-            print ("alignType must be 'max' or 'timepoint', not {0}".format(alignType))
-            exit()
-        self.alignType = alignType
-        self.align_percent = 0.95
-        self.num_samples = num_samples
-
-        #limits & priors for the actual fit
-        self.traprc_min = 150
-        self.beta_lims = beta_lims
-
-        self.time_step_calc = time_step_calc
 
         if loadSavedConfig:
             self.load_config(directory)
+        else:
+            self.wf_config = WaveformConfiguration(**wf_conf)
 
     def save_config(self):
         saved_file=os.path.join(self.directory, "fit_params.npy")
@@ -66,6 +64,7 @@ class FitConfiguration(object):
             exit()
 
         self.__dict__.update(pickle.load(open(saved_file, 'rb')))
+        self.wf_config = WaveformConfiguration(**self.wf_conf)
 
     def plot_training_set(self):
         import matplotlib.pyplot as plt

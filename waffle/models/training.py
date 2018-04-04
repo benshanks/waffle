@@ -9,9 +9,71 @@ from abc import ABC, abstractmethod
 from pygama.waveform import Waveform
 from siggen import PPC
 
-from . import VelocityModel, ElectronicsModel, ImpurityModel, ImpurityModelEnds, WaveformModel
+from . import VelocityModel, LowPassFilterModel, HiPassFilterModel, ImpurityModel, ImpurityModelEnds, WaveformModel
 
 max_float = sys.float_info.max
+
+class JointModelBundle(object):
+    def __init__(self, conf, detector):
+        self.conf =conf
+        self.detector = detector
+
+        self.models = []
+        self.index_map = {}
+        self.start_map = {}
+        self.name_map={}
+
+        self.num_params = 0
+        i=0
+        for model_idx, model_name in enumerate(conf["model_list"]):
+            model = self.append(model_name)
+            self.num_params += model.num_params
+            self.start_map[model_idx] = i
+            self.name_map[model_name] = model_idx
+            model.start_idx = i
+
+            for j in range(model.num_params):
+                self.index_map[i] = model_idx
+                i +=1
+
+    def append(self, model_name):
+        #TODO: surely this can be done with introspection
+        if model_name=="VelocityModel":
+            model = VelocityModel(include_beta=self.conf["fit_beta"])
+        elif model_name=="ImpurityModelEnds":
+            model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length)
+        elif model_name == "HiPassFilterModel":
+            model = HiPassFilterModel(order=self.conf["hp_order"])
+        elif model_name == "LowPassFilterModel":
+            model = LowPassFilterModel(order=self.conf["lp_order"], include_zeros=self.conf["lp_zeros"])
+
+        self.models.append(model)
+        return model
+
+    def get_prior(self):
+        priors = np.array([])
+        for model in self.models:
+            model_prior = model.get_prior()
+            priors = np.concatenate((priors, model_prior))
+        return priors
+
+    def perturb(self, params):
+        which = rng.randint(self.num_params)
+        logH = 0.0
+
+        #find model corresponding to "which"
+        model_number = self.index_map[which]
+        model = self.models[model_number]
+        start_idx = self.start_map[model_number]
+
+        logH += model.perturb(params[start_idx:start_idx+model.num_params], which-start_idx)
+
+        return logH
+
+    def apply_params(self, params):
+        for (model_num, model) in enumerate(self.models):
+            start_idx = self.start_map[model_num]
+            model.apply_to_detector(params[start_idx:start_idx+model.num_params], self.detector)
 
 class Model(object):
     """
@@ -25,41 +87,29 @@ class Model(object):
         #Setup detector and waveforms
         self.setup_detector()
         self.wf_models = []
-        self.setup_waveforms(doPrint=False)
-
-        self.alignidx_guess = self.conf.align_idx
-        self.max_maxt = self.alignidx_guess + 5
-        self.min_maxt = self.alignidx_guess - 5
-        self.maxt_sigma = 1
+        self.setup_waveforms(self.conf.wf_config, doPrint=False)
 
         self.changed_wfs = np.zeros(self.num_waveforms)
 
         #Set up all the models...
-        self.electronics_model = ElectronicsModel(include_zeros=self.conf.fit_zeros, order_number=self.conf.lp_order)
-        self.velo_model = VelocityModel(include_beta=self.conf.fit_beta)
-        self.imp_model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length)
-
-        self.tf_first_idx = 0
-        self.velo_first_idx = self.tf_first_idx + self.electronics_model.get_num_params()
-        self.imp_first_idx = self.velo_first_idx + self.velo_model.get_num_params()
-        self.num_det_params = self.imp_first_idx  + self.imp_model.get_num_params()
+        self.joint_models = JointModelBundle(self.conf.model_conf, self.detector)
+        self.num_det_params = self.joint_models.num_params
 
     def setup_detector(self):
         timeStepSize = self.conf.time_step_calc
 
         #TODO: wtf is going on with wf length?
         det = PPC( self.conf.siggen_conf_file, wf_padding=500)
-
         self.detector = det
 
-    def setup_waveforms(self, doPrint=False):
-        wfFileName = self.conf.wf_file_name
+    def setup_waveforms(self, wf_conf, doPrint=False):
+        wfFileName = wf_conf.wf_file_name
 
         if os.path.isfile(wfFileName):
             print("Loading wf file {0}".format(wfFileName))
             data = np.load(wfFileName, encoding="latin1")
             wfs = data['wfs']
-            self.wfs = wfs[self.conf.wf_idxs]
+            self.wfs = wfs[wf_conf.wf_idxs]
             self.num_waveforms = self.wfs.size
 
             # self.rc1_guess = data['rc1']
@@ -73,9 +123,9 @@ class Model(object):
         baselineLengths = np.zeros(wfs.size)
 
         for (wf_idx,wf) in enumerate(self.wfs):
-          total_samples = self.conf.num_samples
-          full_samples = self.conf.align_idx
-          wf.window_waveform(time_point=self.conf.align_percent, early_samples=self.conf.align_idx, num_samples=total_samples)
+          total_samples = wf_conf.num_samples
+          full_samples = wf_conf.align_idx
+          wf.window_waveform(time_point=wf_conf.align_percent, early_samples=wf_conf.align_idx, num_samples=total_samples)
 
         #   dec_idx = 150
         #   dec_factor = 20
@@ -85,16 +135,16 @@ class Model(object):
         #   wf.windowed_wf = np.concatenate((wf.windowed_wf[:dec_idx], wf.windowed_wf[dec_idx::dec_factor]))
         #   wf.window_length = len(wf.windowed_wf)
 
-          self.wf_models.append(WaveformModel(wf, align_percent=self.conf.align_percent, detector=self.detector))
+          self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector))
 
           if doPrint:
               print( "wf %d length %d (entry %d from run %d)" % (wf_idx, wf.window_length, wf.entry_number, wf.runNumber))
           baselineLengths[wf_idx] = wf.t0_estimate
 
         #TODO: this doesn't work if the calc step size isn't 1 ns
-        self.siggen_wf_length = np.int(  (self.conf.align_idx - np.amin(baselineLengths) + 10)*(10  ))
+        self.siggen_wf_length = np.int(  (wf_conf.align_idx - np.amin(baselineLengths) + 10)*(10  ))
 
-        self.output_wf_length = np.int( self.conf.num_samples + 1 )
+        self.output_wf_length = np.int( wf_conf.num_samples + 1 )
 
         self.num_wf_params = self.wf_models[0].num_params
 
@@ -106,11 +156,8 @@ class Model(object):
 
         wf_params = np.concatenate([ wf.get_prior()[:] for wf in self.wf_models ])
 
-        prior = np.hstack([
-              self.electronics_model.get_prior()[:],
-              self.velo_model.get_prior()[:],
-              self.imp_model.get_prior()[:],
-              wf_params[:]
+        prior = np.concatenate([
+              self.joint_models.get_prior(), wf_params
             ])
 
         if False:#print out the prior to make sure i know what i'm doing
@@ -144,8 +191,7 @@ class Model(object):
                 reps += np.int(np.power(100.0, rng.rand()));
 
             for i in range(reps):
-                which = rng.randint(self.num_det_params)
-                logH += self.perturb_detector(params, which)
+                logH += self.joint_models.perturb(params)
 
         else:
             #adjust at least one waveform:
@@ -169,46 +215,23 @@ class Model(object):
                 reps = 1;
                 reps += np.int(np.power(100.0, rng.rand()));
                 for i in range(reps):
-                    which = rng.randint(self.num_det_params)
-                    logH += self.perturb_detector(params, which)
+                    logH += self.joint_models.perturb(params)
 
         return logH
-
-    def perturb_detector(self, params, which):
-        old_params = np.copy(params)
-        logH = 0.0
-        if which >=self.tf_first_idx and which < self.velo_first_idx:
-            logH += self.electronics_model.perturb(params[self.tf_first_idx:self.velo_first_idx], which-self.tf_first_idx)
-        elif which >= self.velo_first_idx and which < self.imp_first_idx:
-            logH += self.velo_model.perturb(params[self.velo_first_idx:self.imp_first_idx], which-self.velo_first_idx)
-        elif which >= self.imp_first_idx and which < self.num_det_params:
-            logH += self.imp_model.perturb(params[self.imp_first_idx:self.num_det_params], which-self.imp_first_idx)
-        elif which >= self.num_det_params:
-            raise IndexError("detector which value %d  not supported" % which)
-
-        return logH
-
 
     def perturb_wf(self, params, wf_idx, ):
         logH = self.wf_models[wf_idx].perturb(  params[self.num_det_params + wf_idx*self.num_wf_params: self.num_det_params + (wf_idx+1)*self.num_wf_params])
-
         return logH
-
 
     def log_likelihood(self, params):
         if np.any(np.isnan(params)): return -np.inf
 
         return self.fit_manager.calc_likelihood(params)
 
-    def apply_detector_params(self, det_wf_params):
-        try:
-            self.electronics_model.apply_to_detector(det_wf_params[self.tf_first_idx: self.velo_first_idx], self.detector)
-            self.velo_model.apply_to_detector(det_wf_params[self.velo_first_idx: self.imp_first_idx], self.detector)
-            self.imp_model.apply_to_detector(det_wf_params[self.imp_first_idx: self.num_det_params], self.detector)
-        except ValueError:
-            return None
-
     def calc_wf_likelihood(self, det_wf_params, wf_idx ):
-        self.apply_detector_params(det_wf_params)
+        try:
+            self.joint_models.apply_params(det_wf_params)
+        except ValueError:
+            return -np.inf
 
         return self.wf_models[wf_idx].calc_likelihood(det_wf_params[self.num_det_params:])

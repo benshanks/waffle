@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .electronics import ElectronicsModel
+from .electronics import HiPassFilterModel, LowPassFilterModel
 # from .electronics import ElectronicsModel_old
 
 from .velocity import VelocityModel
