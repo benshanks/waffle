@@ -142,14 +142,14 @@ class HiPassFilterModel(DigitalFilterBase):
             # Parameter("zero_mag", "uniform", lim_lo=0, lim_hi=1),
             # Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=np.pi),
             Parameter("pole_mag", "uniform", lim_lo=-6, lim_hi=-1),
-            Parameter("pole_phi", "uniform", lim_lo=-15, lim_hi=-2),
+            Parameter("pole_phi", "uniform", lim_lo=-20, lim_hi=-2),
         ]
 
         if order == 4:
             self.params.append(
-                Parameter("pole_mag2", "uniform", lim_lo=-15, lim_hi=-6))
+                Parameter("pole_mag2", "uniform", lim_lo=-7, lim_hi=-6))
             self.params.append(
-                Parameter("pole_phi2", "uniform", lim_lo=-15, lim_hi=-2 )
+                Parameter("pole_phi2", "uniform", lim_lo=-20, lim_hi=-2 )
                 )
 
         # if zeros:
