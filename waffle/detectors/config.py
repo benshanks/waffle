@@ -94,7 +94,7 @@ def get_ortec_detector_info(detector_name):
 
     return detector_info
 
-def detector_info_to_conf_file(detector_info, output_name):
+def detector_info_to_conf_file(detector_info):
 
     #convert this all to siggen-style
     siggen_dict = get_ortec_siggen_default(detector_info.name)
