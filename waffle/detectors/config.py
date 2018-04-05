@@ -119,6 +119,7 @@ def get_ortec_siggen_default(detector_name):
         "ditch_depth":0,
         "ditch_thickness":0
         }
+    return sig_dic
 
 def get_bege_siggen_default(detector_name):
     sig_dic = get_siggen_default(detector_name)
