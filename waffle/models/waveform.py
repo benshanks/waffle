@@ -16,17 +16,15 @@ class WaveformModel(ModelBaseClass):
     """
     Specify the model in Python.
     """
-    def __init__(self, target_wf, align_percent, detector, align_idx=125):
+    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smooth=True):
 
         self.detector = detector
-        self.num_params = 6
+
         self.target_wf = target_wf
         self.align_percent = align_percent
 
         self.align_sigma = 1
         self.align_idx = align_idx
-
-        smooth_guess = 20
 
         self.params = [
             Parameter("r", "uniform", lim_lo=0, lim_hi=detector.detector_radius),
@@ -34,8 +32,14 @@ class WaveformModel(ModelBaseClass):
             Parameter("phi", "uniform", lim_lo=0, lim_hi=np.pi/4),
             Parameter("scale", "gaussian", mean=target_wf.amplitude, variance=20, lim_lo=0.5*target_wf.amplitude, lim_hi=1.5*target_wf.amplitude),
             Parameter("t_align", "gaussian", mean=self.align_idx, variance=self.align_sigma, lim_lo=self.align_idx-5, lim_hi=self.align_idx+5),
-            Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100)
         ]
+
+        self.do_smooth=do_smooth
+        if do_smooth:
+            smooth_guess = 20
+            self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
+
+        self.num_params = len(self.params)
 
     def draw_position(self, wf_idx):
       r = rng.rand() * self.detector.detector_radius
@@ -78,7 +82,14 @@ class WaveformModel(ModelBaseClass):
         return prior
 
     def make_waveform(self, data_len, wf_params, charge_type=None):
-        r, z, phi, scale, maxt, smooth =  wf_params
+        r, z, phi, scale, maxt =  wf_params[:5]
+        if self.do_smooth:
+            smooth = wf_params[:6]
+            if smooth < 0:
+                raise ValueError("Smooth should not be below 0 (value {})".format(smooth))
+                return None
+        else:
+            smooth = None
 
         # r = rad * np.cos(theta)
         # z = rad * np.sin(theta)
@@ -86,9 +97,7 @@ class WaveformModel(ModelBaseClass):
         if scale < 0:
             raise ValueError("Scale should not be below 0 (value {})".format(scale))
             return None
-        if smooth < 0:
-            raise ValueError("Smooth should not be below 0 (value {})".format(smooth))
-            return None
+
         if not self.detector.IsInDetector(r, phi, z):
             raise ValueError("Point {},{},{} is outside detector.".format(r,phi,z))
             return None

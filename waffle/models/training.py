@@ -137,7 +137,7 @@ class Model(object):
         #   wf.windowed_wf = np.concatenate((wf.windowed_wf[:dec_idx], wf.windowed_wf[dec_idx::dec_factor]))
         #   wf.window_length = len(wf.windowed_wf)
 
-          self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector))
+          self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector, do_smooth=wf_conf.do_smooth))
 
           if doPrint:
               print( "wf %d length %d (entry %d from run %d)" % (wf_idx, wf.window_length, wf.entry_number, wf.runNumber))
