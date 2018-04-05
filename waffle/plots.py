@@ -211,21 +211,22 @@ class TrainingPlotter(PlotterBase):
             w_hi = np.logspace(-15, -6, 500, base=np.pi)
             w_lo = np.logspace(-6, 0, 500, base=np.pi)
 
-            # (w_hi, h,  h2) = em_hi.get_freqz(hi_data, w_hi)
-            # (w_lo, h3, h4) = em_lo.get_freqz(lo_data, w_lo)
-            (w_hi, h) = em_hi.get_freqz(hi_data, w_hi)
-            (w_lo, h3) = em_lo.get_freqz(lo_data, w_lo)
-
-            if p is None:
-                p = ax[1].loglog( w_hi, np.abs(h), alpha = 0.2)
-                # p2 = ax[1].loglog( w_hi, np.abs(h2), alpha = 0.2)
-                p3 = ax[2].loglog( w_lo, np.abs(h3), alpha = 0.2)
-                # p4 = ax[2].loglog( w_lo, np.abs(h4), alpha = 0.2)
+            if em_hi.order == 4:
+                (w_hi, h,  h2) = em_hi.get_freqz(hi_data, w_hi)
+                p2 = ax[1].loglog( w_hi, np.abs(h2), alpha = 0.2, color=colors[3])
+                ax[1].loglog( w_hi, np.abs(h2*h), alpha = 0.2, color="k")
             else:
-                ax[1].loglog( w_hi, np.abs(h), c=p[0].get_color(), alpha = 0.2)
-                # ax[1].loglog( w_hi, np.abs(h2), c=p2[0].get_color(), alpha = 0.2)
-                ax[2].loglog( w_lo, np.abs(h3), c=p3[0].get_color(), alpha = 0.2)
-                # ax[2].loglog( w_lo, np.abs(h4), c=p4[0].get_color(), alpha = 0.2)
+                (w_hi, h) = em_hi.get_freqz(hi_data, w_hi)
+
+            if em_lo.order == 4:
+                (w_lo, h3, h4) = em_lo.get_freqz(lo_data, w_lo)
+                p4 = ax[2].loglog( w_lo, np.abs(h4), alpha = 0.2, color=colors[4])
+                ax[2].loglog( w_lo, np.abs(h3*h4), alpha = 0.2, color="k")
+            else:
+                (w_lo, h3) = em_lo.get_freqz(lo_data, w_lo)
+
+            p = ax[1].loglog( w_hi, np.abs(h), alpha = 0.2, color=colors[0])
+            p3 = ax[2].loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[1])
 
 
         an = np.linspace(0,np.pi,200)
