@@ -6,17 +6,22 @@ import matplotlib.pyplot as plt
 from waffle.plots import TrainingPlotter
 
 def main(dir_name, num_samples=2000, sample_dec=1 ):
-    plotter = TrainingPlotter(dir_name, int(num_samples), int(sample_dec))
+    num_samples = int(num_samples)
 
-    plotter.plot_waveforms(print_det_params=False)
+    plotter = TrainingPlotter(dir_name, num_samples, int(sample_dec))
+
     # plotter.plot_waveform_components()
-    plotter.plot_tf()
+
     # plotter.plot_imp()
     #
     # plotter.plot_detector_pair()
 
-    plotter.plot_trace()
-    # plotter.plot_waveform_trace()
+    if num_samples == -1:
+        plotter.plot_trace()
+        plotter.plot_waveform_trace()
+    else:
+        plotter.plot_waveforms(print_det_params=False)
+        plotter.plot_tf()
 
     plt.show()
 
