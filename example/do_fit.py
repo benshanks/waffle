@@ -10,23 +10,27 @@ from waffle.management import LocalFitManager, FitConfiguration
 
 chan_dict = {
 600: "B8482",
+626: "P42574A",
+640:"P42665A",
+648:"P42664A",
+672: "P42661A",
 692: "B8474"
 }
 
-def main(doPlot=False):
+def main(chan, doPlot=False):
 
     # directory = "4wf_648_zero"
     # wf_file = "training_data/chan648_8wfs.npz"
     # conf_name = "P42664A.conf"
 
-    chan = 692
-    directory = "2wf_{}_trapzero".format(chan)
+    chan = int(chan)
+    directory = "8wf_overshoot4_{}".format(chan)
 
     wf_file = "training_data/chan{}_8wfs.npz".format(chan)
     conf_name = "{}.conf".format( chan_dict[chan] )
 
-    # wf_idxs = np.arange(0,8,2)
-    wf_idxs = [1,2]
+    wf_idxs = np.arange(0,8)
+    # wf_idxs = [1,2]
 
     # wf_file = "16wf_set_chan{}.npz".format(chan)
     # wf_idxs = np.arange(0,16,4)
@@ -40,14 +44,16 @@ def main(doPlot=False):
         "wf_idxs":wf_idxs,
         "align_idx":125,
         "num_samples":1000,
+        "do_smooth":True,
+        "smoothing_type":"gaussian"
     }
 
     model_conf = {
-        "model_list": ["VelocityModel", "LowPassFilterModel", "HiPassFilterModel", "ImpurityModelEnds", "TrappingModel"],
+        "model_list": ["VelocityModel", "LowPassFilterModel", "HiPassFilterModel", "ImpurityModelEnds", "TrappingModel", "OvershootFilterModel"],
         "fit_beta":False,
-        "lp_order":2,
-        "hp_order":2,
-        "lp_zeros":True
+        "lp_order":4,
+        "hp_order":4,
+        "lp_zeros":False
     }
 
     conf = FitConfiguration(
@@ -73,7 +79,7 @@ def main(doPlot=False):
     else:
         os.makedirs(directory)
 
-    fm = LocalFitManager(conf, num_threads=2)
+    fm = LocalFitManager(conf, num_threads=8)
 
     conf.save_config()
     fm.fit(numLevels=1000, directory = directory,new_level_interval=5000, numParticles=3)
