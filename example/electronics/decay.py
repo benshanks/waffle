@@ -8,9 +8,7 @@ from siggen import PPC
 from scipy import signal
 from scipy.ndimage.filters import gaussian_filter1d
 
-from waffle.models.electronics import HiPassFilterModel
-
-em = HiPassFilterModel()
+from siggen.electronics import DigitalFilter
 
 det = PPC( os.path.join(os.environ["DATADIR"],  "siggen", "config_files", "bege.config"), wf_padding=100)
 imp_avg = -2
@@ -23,18 +21,22 @@ def main():
 
 
 def poles(det):
-    det.lp_order=2
 
-    det.lp_num = [1,2,1]
-    det.lp_den = em.zpk_to_ba(0.975, 0.007)
+    lowpass = DigitalFilter(2)
+    lowpass.num = [1,2,1]
+    lowpass.set_poles(0.975, 0.007)
 
-    det.hp_order = 2
-
-
-    mag = 1.-10.**-5.145
+    mag = 1.-10.**-7
     phi = np.pi**-13.3
-    det.hp_num = [1,-2,1]
-    det.hp_den = em.zpk_to_ba(mag, phi)
+
+    hipass = DigitalFilter(2)
+    hipass.num = [1,-2,1]
+    hipass.set_poles(mag, phi)
+
+    det.AddDigitalFilter(lowpass)
+    det.AddDigitalFilter(hipass)
+
+
 
     wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
     wf_compare = np.copy(wf_proc)
@@ -49,7 +51,7 @@ def poles(det):
     mags = 1 - np.logspace(-7.5, -6.5, 100, base=10)
     # phis = np.pi - phis
 
-    w,h = get_freq_resp(mag, phi)
+    w,h = get_freq_resp(hipass)
     ax[0,1].loglog( w, h, color="r")
 
     # for phi2 in phis:
@@ -59,9 +61,7 @@ def poles(det):
         phi2=phi
         color = cmap( (mag2 - mags[0])/(mags[-1] - mags[0]) )
 
-        det.hp_num = [[1,-2,1], [1,-2,1]]
-        det.hp_den = [em.zpk_to_ba(mag, phi), em.zpk_to_ba(mag2, phi2)]
-        det.hp_order=4
+        hipass.set_poles(mag2, phi2)
 
         wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
 
@@ -71,89 +71,25 @@ def poles(det):
         except TypeError:
             continue
 
-        w,h2 = get_freq_resp(mag, phi, p_mag2=mag2, p_phi2=phi2)
+        w,h2 = get_freq_resp(hipass)
         ax[0,1].loglog( w, h2, color=color)
 
 
     # plt.legend()
     plt.show()
 
-def zeros(det):
-    det.lp_order=2
-
-    det.lp_num = [1,2,1]
-    det.lp_den = em.zpk_to_ba(0.975, 0.007)
-
-    det.hp_order = 2
-
-
-    mag = 1.-10.**-5.145
-    phi = np.pi**-13.3
-    det.hp_num = [1,-2,1]
-    det.hp_den = em.zpk_to_ba(mag, phi)
-
-    wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
-    wf_compare = np.copy(wf_proc)
-
-    f, ax = plt.subplots(2,2,figsize=(15,8))
-    ax[0,0].plot (wf_compare,  color="r")
-
-    cmap = cm.get_cmap('viridis')
-
-    phis = np.logspace(-20, -8, 100, base=np.pi)
-    mags = 1-np.logspace(-7, 7, 100, base=10)
-    # phis = np.pi - phis
-
-    w,h = get_freq_resp(mag, phi)
-    ax[0,1].loglog( w, h, color="r")
-
-    # for phi2 in phis:
-        # color = cmap( (phi2 - phis[0])/(phis[-1] - phis[0]) )
-        # mag2=mag
-    for mag2 in mags:
-        phi2= np.pi**-13
-
-        color = cmap( (mag2 - mags[0])/(mags[-1] - mags[0]) )
-
-        det.hp_num = em.zpk_to_ba(mag2, phi2)
-        det.hp_num /= np.sum(det.hp_num)/np.sum(det.hp_den)
-
-        wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
-
-        w,h2 = get_freq_resp(mag, phi, mag2, phi2)
-        ax[0,1].loglog( w, h2, color=color)
-
-        try:
-            ax[0,0].plot (wf_proc, label="{}, {}".format(phi,mag), color=color)
-            ax[1,0].plot (wf_proc-wf_compare, label="{}, {}".format(phi,mag), color=color)
-        except TypeError:
-            continue
-
-
-    # plt.legend()
-    plt.show()
-
-
-def get_freq_resp(p_mag, p_phi, z_mag=None, z_phi=None, p_mag2=None, p_phi2=None):
+def get_freq_resp(hipass1):
     freq_samp = 1E9
     nyq_freq = 0.5*freq_samp
 
-    den1 = em.zpk_to_ba(p_mag, p_phi)
+    w = np.logspace(-15, -7, 500, base=np.pi)
 
-    if z_mag is None:
-        num = np.array([1,-2,1])
-    else:
-        num = em.zpk_to_ba(z_mag, z_phi)
-        num /= np.sum(num)/np.sum(den1)
+    w, h = signal.freqz(hipass1.num, hipass1.den, worN=w)
 
-    w =np.logspace(-15, -7, 500, base=np.pi)
-
-    w, h = signal.freqz(num, den1, worN=w)
-
-    if p_mag2 is not None:
-        den2 = em.zpk_to_ba(p_mag2, p_phi2)
-        w, h2 = signal.freqz(num, den2, worN=w)
-        h *= h2
+    # if p_mag2 is not None:
+    #     den2 = em.zpk_to_ba(p_mag2, p_phi2)
+    #     w, h2 = signal.freqz(num, den2, worN=w)
+    #     h *= h2
 
     w/= (np.pi /nyq_freq)
 
