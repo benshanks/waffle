@@ -6,7 +6,6 @@ from ._parameterbase import JointModelBase, Parameter
 class VelocityModel(JointModelBase):
 
     def __init__(self,E_lo=250, E_hi=1000,include_beta=True, beta_lims=[0.1,2]):
-        self.num_params = 6 if include_beta else 4
         self.E_lo = E_lo
         self.E_hi = E_hi
 

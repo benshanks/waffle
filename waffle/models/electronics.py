@@ -3,80 +3,42 @@ import numpy as np
 from scipy import signal
 
 from ._parameterbase import JointModelBase, Parameter
+from siggen.electronics import DigitalFilter, GretinaOvershootFilter
 
 class DigitalFilterBase(JointModelBase):
-    def __init__(self, order, include_zeros):
-        freq_samp = 1E9
-        self.nyq_freq = 0.5*freq_samp
-
+    def __init__(self, detector, order, include_zeros):
+        assert (order==1 or order==2)
         self.order = order
         self.include_zeros = include_zeros
 
-    def zpk_to_ba(self, pole,phi):
-        return [1, -2*pole*np.cos(phi), pole**2]
+        self.digital_filter = DigitalFilter(order)
+        detector.AddDigitalFilter(self.digital_filter)
 
-    def exp_magphi(self, mag, phi):
+        freq_samp = 1E9
+        self.nyq_freq = 0.5*freq_samp
+
+    def exp_magphi(self, mag, phi=0):
+        if phi == 0: return [1. - 10.**mag]
         return (1. - 10.**mag, np.pi**phi)
-
-    def get_num_den(self, params):
-        if self.include_zeros:
-            zmag, zphi   = params[self.order:2+self.order]
-            num = self.zpk_to_ba(zmag, zphi )
-            if self.order == 4:
-                raise NotImplementedError("Electronics Filter only works with zeros if second order")
-        else:
-            num = self.default_num
-
-        if self.order == 4 :
-            pmag, pphi, pmag2, pphi2   = params[:4]
-            if self.exp: pmag2, pphi2 = self.exp_magphi(pmag2, pphi2)
-            if self.exp: pmag, pphi = self.exp_magphi(pmag, pphi)
-
-            den1 = self.zpk_to_ba(pmag, pphi)
-            den2 = self.zpk_to_ba(pmag2, pphi2)
-            num_ret = [ num, num]
-            den_ret = [den1, den2]
-        elif self.order == 2:
-            pmag, pphi   = params[:2]
-            if self.exp: pmag, pphi = self.exp_magphi(pmag, pphi)
-
-            num_ret = num
-            den_ret = self.zpk_to_ba(pmag, pphi)
-        elif self.order ==1:
-            assert len(params)==1
-            real_mag = params
-
-            num_ret = self.default_num
-            den_ret = [1, -real_mag]
-        else:
-            raise NotImplementedError("Electronics Filter only works for first, second, and fourth order.")
-
-        return (num_ret, den_ret)
-
 
     def get_pz(self, params):
 
         return_dict = {
-            "poles":[],
-            "zeros":[]
+            "poles":self.digital_filter.poles,
+            "zeros":self.digital_filter.zeros
         }
 
-        if self.include_zeros:
-            zmag, zphi   = params[self.order:self.order+2]
-            return_dict["zeros"].append( zmag * np.exp(1j*zphi) )
-
-        pmag, pphi = params[:2]
-
-        if self.exp: pmag, pphi = self.exp_magphi(pmag, pphi)
-
-        return_dict["poles"].append( pmag * np.exp(1j*pphi))
-
-        if self.order == 4 :
-            pmag2, pphi2  = params[2:4]
-            if self.exp: pmag2, pphi2 = self.exp_magphi(pmag2, pphi2)
-            return_dict["poles"].append(  pmag2 * np.exp(1j*pphi2) )
-
         return return_dict
+
+    def apply_to_detector(self, params, detector):
+        pole_params = params[:self.order]
+        if self.exp: pole_params = self.exp_magphi(*pole_params)
+                
+        self.digital_filter.set_poles(*pole_params)
+
+        if self.include_zeros:
+            zero_params = params[self.order:self.order+self.order]
+            self.digital_filter.set_zeros(*zero_params)
 
     def get_freqz(self, params, w):
         # w=np.logspace(-15, -5, 500, base=np.pi)
@@ -88,102 +50,87 @@ class DigitalFilterBase(JointModelBase):
             w, h = signal.freqz(num, den, worN=w )
             w/= (np.pi /self.nyq_freq)
             return w, h
-        elif self.order == 4 :
-            if np.sum(num[0]) != 0: num[0] /= np.sum(num[0])/np.sum(den[0])
-            if np.sum(num[1]) != 0: num[1] /= np.sum(num[1])/np.sum(den[1])
 
-            w, h = signal.freqz(num[0], den[0], worN=w )
-            w, h2 = signal.freqz(num[1], den[1], worN=w)
-
-            w/= (np.pi /self.nyq_freq)
-            return w, h, h2
 
 class LowPassFilterModel(DigitalFilterBase):
-    def __init__(self,order=2, include_zeros=False):
-        super().__init__(order, include_zeros)
-
-        self.include_zeros = include_zeros
-        self.default_num = [1,2,1]
+    def __init__(self,detector, order=2, include_zeros=False):
+        super().__init__(detector, order, include_zeros)
         self.exp = False
 
-        self.params = [
-            #I know from experience that the lowpass poles are near (0,1)
-            #(makes sense cause the amplitude response should fall off near nyquist freq)
-            #just go ahead and shove the priors up near there
-            Parameter("pole_mag", "uniform", lim_lo=0.9, lim_hi=1),
-            Parameter("pole_phi", "uniform", lim_lo=0, lim_hi=0.1),
-        ]
-
-        if order == 4:
-            self.params.append(
-                Parameter("pole_mag2", "uniform", lim_lo=0.9, lim_hi=1))
-            self.params.append(
-                Parameter("pole_phi2", "uniform", lim_lo=0, lim_hi=0.1)
+        if self.order == 1:
+            self.params = [
+                Parameter("pole_mag", "uniform", lim_lo=0, lim_hi=1),
+            ]
+            if self.include_zeros:
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=-10, lim_hi=10)
                 )
+            else:
+                self.digital_filter.num = [1,1]
 
-        if include_zeros:
-            self.params.append(
-                Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
-            self.params.append(
-                Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=0.5)
+        elif self.order == 2:
+            self.params = [
+                #I know from experience that the lowpass poles are near (0,1)
+                #(makes sense cause the amplitude response should fall off near nyquist freq)
+                #just go ahead and shove the priors up near there
+                Parameter("pole_mag", "uniform", lim_lo=0.9, lim_hi=1),
+                Parameter("pole_phi", "uniform", lim_lo=0, lim_hi=0.1),
+            ]
+
+            if self.include_zeros:
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
+                self.params.append(
+                    Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=0.5)
                 )
-
-
-        self.num_params = len(self.params)
-
-    def apply_to_detector(self, params, detector):
-        num, den = self.get_num_den(params)
-        detector.lp_num = num
-        detector.lp_den = den
-
-        if self.order==4: detector.lp_order = 4
-        else: detector.lp_order = 2
+            else:
+                self.digital_filter.num = [1,2,1]
 
 class HiPassFilterModel(DigitalFilterBase):
-    def __init__(self,order=2):
-        super().__init__(order, include_zeros=False)
-
-        self.default_num = [1,-2,1]
+    def __init__(self, detector, order=2, include_zeros=False):
+        super().__init__(detector, order, include_zeros)
         self.exp = True
 
-        self.params = [
-            # Parameter("zero_mag", "uniform", lim_lo=0, lim_hi=1),
-            # Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=np.pi),
-            Parameter("pole_mag", "uniform", lim_lo=-6, lim_hi=-1),
-            Parameter("pole_phi", "uniform", lim_lo=-20, lim_hi=-2),
-        ]
-
-        if order == 4:
-            self.params.append(
-                Parameter("pole_mag2", "uniform", lim_lo=-7, lim_hi=-6))
-            self.params.append(
-                Parameter("pole_phi2", "uniform", lim_lo=-20, lim_hi=-2 )
+        if self.order == 1:
+            self.params = [
+                Parameter("pole_mag", "uniform", lim_lo=-6, lim_hi=-1),
+            ]
+            if self.include_zeros:
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=-10, lim_hi=10)
                 )
+            else:
+                self.digital_filter.num = [1,-1]
 
-        # if zeros:
-        #     self.params.append(
-        #         Parameter("zero_mag", "uniform", lim_lo=0, lim_hi=10))
-        #     self.params.append(
-        #         Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=np.pi)
-        #         )
-        self.num_params = len(self.params)
+        elif self.order == 2:
+            self.params = [
+                #I know from experience that the lowpass poles are near (0,1)
+                #(makes sense cause the amplitude response should fall off near nyquist freq)
+                #just go ahead and shove the priors up near there
+                Parameter("pole_mag", "uniform", lim_lo=-6, lim_hi=-1),
+                Parameter("pole_phi", "uniform", lim_lo=-20, lim_hi=-2),
+            ]
 
-    def apply_to_detector(self, params, detector):
-        num, den = self.get_num_den(params)
-        detector.hp_num = num
-        detector.hp_den = den
+            if include_zeros:
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
+                self.params.append(
+                    Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=0.5)
+                )
+            else:
+                self.digital_filter.num = [1,-2,1]
 
-        if self.order==4: detector.hp_order = 4
-        else: detector.hp_order = 2
 
 class OvershootFilterModel(JointModelBase):
-    def __init__(self):
-        self.num_params = 2
+    def __init__(self, detector):
 
         self.params = [
             Parameter("pole", "gaussian", 2, 2, lim_lo=0, lim_hi=100),
             Parameter("fraction", "uniform", lim_lo=0, lim_hi=0.25)
         ]
+        self.digital_filter = GretinaOvershootFilter(order=1)
+        self.digital_filter.num = [1,-1]
+        detector.AddDigitalFilter(self.digital_filter)
 
     def apply_to_detector(self, params, detector):
         freq = 1E9
@@ -192,15 +139,10 @@ class OvershootFilterModel(JointModelBase):
 
         rc1_dig= 1E-6 * (rc1_us) * freq
         rc1_exp = np.exp(-1./rc1_dig)
-        num = [1,-1]
-        den = [1, -rc1_exp]
 
-        detector.overshoot = 1
-        detector.overshoot_frac = overshoot_frac
-        detector.overshoot_num = num
-        detector.overshoot_den = den
+        self.digital_filter.den = [1, -rc1_exp]
+        self.digital_filter.overshoot_frac = overshoot_frac
 
-#
 # class ElectronicsModel(JointModelBase):
 #     """
 #     2-pole digital filter for both HP and LP halves
@@ -235,7 +177,6 @@ class OvershootFilterModel(JointModelBase):
 #                 Parameter("hp_phi2", "uniform", lim_lo=0, lim_hi=np.pi)
 #                 )
 #
-#         self.num_params = len(self.params)
 #
 #     def get_freqz(self, params):
 #
@@ -310,7 +251,6 @@ class ElectronicsModel_old(JointModelBase):
     Specify the model in Python.
     """
     def __init__(self,timestep=1E-9):
-        self.num_params = 5
         self.timestep=timestep
 
         #pretty good starting point for MJD detectors

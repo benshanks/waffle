@@ -24,13 +24,13 @@ def main(chan, doPlot=False):
     # conf_name = "P42664A.conf"
 
     chan = int(chan)
-    directory = "8wf_overshoot4_{}".format(chan)
+    directory = "2wf_test_{}".format(chan)
 
     wf_file = "training_data/chan{}_8wfs.npz".format(chan)
     conf_name = "{}.conf".format( chan_dict[chan] )
 
-    wf_idxs = np.arange(0,8)
-    # wf_idxs = [1,2]
+    # wf_idxs = np.arange(0,8)
+    wf_idxs = [1,3]
 
     # wf_file = "16wf_set_chan{}.npz".format(chan)
     # wf_idxs = np.arange(0,16,4)
@@ -49,11 +49,12 @@ def main(chan, doPlot=False):
     }
 
     model_conf = {
-        "model_list": ["VelocityModel", "LowPassFilterModel", "HiPassFilterModel", "ImpurityModelEnds", "TrappingModel", "OvershootFilterModel"],
-        "fit_beta":False,
-        "lp_order":4,
-        "hp_order":4,
-        "lp_zeros":False
+        "VelocityModel":{"include_beta":False},
+        "LowPassFilterModel": {"order":2},
+        "HiPassFilterModel": {"order":1},
+        "OvershootFilterModel":{},
+        "ImpurityModelEnds": {},
+        "TrappingModel":{},
     }
 
     conf = FitConfiguration(
@@ -79,7 +80,7 @@ def main(chan, doPlot=False):
     else:
         os.makedirs(directory)
 
-    fm = LocalFitManager(conf, num_threads=8)
+    fm = LocalFitManager(conf, num_threads=2)
 
     conf.save_config()
     fm.fit(numLevels=1000, directory = directory,new_level_interval=5000, numParticles=3)

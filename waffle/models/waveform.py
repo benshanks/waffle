@@ -47,8 +47,6 @@ class WaveformModel(ModelBaseClass):
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
                 self.params.append(Parameter("skew", "gaussian", mean=skew_guess, variance=5, lim_lo=-np.inf, lim_hi=np.inf))
 
-        self.num_params = len(self.params)
-
     def draw_position(self, wf_idx):
       r = rng.rand() * self.detector.detector_radius
       z = rng.rand() * self.detector.detector_length

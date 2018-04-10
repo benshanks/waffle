@@ -4,7 +4,6 @@ import numpy.random as rng
 import dnest4
 from abc import ABC, abstractmethod
 
-
 max_float = sys.float_info.max
 
 class Parameter(object):
@@ -75,7 +74,8 @@ class ModelBaseClass(ABC):
             prior[i] = self.params[i].draw_from_prior()
         return prior
 
-    def get_num_params(self):
+    @property
+    def num_params(self):
         return len(self.params)
 
 class JointModelBase(ModelBaseClass):

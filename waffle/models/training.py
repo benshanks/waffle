@@ -25,8 +25,8 @@ class JointModelBundle(object):
 
         self.num_params = 0
         i=0
-        for model_idx, model_name in enumerate(conf["model_list"]):
-            model = self.append(model_name)
+        for model_idx, model_name in enumerate(self.conf.keys()):
+            model = self.append(model_name, self.conf[model_name])
             self.num_params += model.num_params
             self.start_map[model_idx] = i
             self.name_map[model_name] = model_idx
@@ -36,20 +36,20 @@ class JointModelBundle(object):
                 self.index_map[i] = model_idx
                 i +=1
 
-    def append(self, model_name):
+    def append(self, model_name, model_conf):
         #TODO: surely this can be done with introspection
         if model_name=="VelocityModel":
-            model = VelocityModel(include_beta=self.conf["fit_beta"])
+            model = VelocityModel(**model_conf)
         elif model_name=="ImpurityModelEnds":
-            model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length)
+            model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length, **model_conf)
         elif model_name == "HiPassFilterModel":
-            model = HiPassFilterModel(order=self.conf["hp_order"])
+            model = HiPassFilterModel(self.detector, **model_conf)
         elif model_name == "LowPassFilterModel":
-            model = LowPassFilterModel(order=self.conf["lp_order"], include_zeros=self.conf["lp_zeros"])
+            model = LowPassFilterModel(self.detector, **model_conf)
         elif model_name ==  "OvershootFilterModel":
-            model = OvershootFilterModel()
+            model = OvershootFilterModel(self.detector, **model_conf)
         elif model_name ==  "TrappingModel":
-            model = TrappingModel()
+            model = TrappingModel(**model_conf)
 
         self.models.append(model)
         return model
