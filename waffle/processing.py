@@ -178,8 +178,8 @@ class DataProcessor():
 
         return cal_map
 
-    def tier0(self, runList, min_signal_thresh, chanList=None):
-        process_tier_0(self.raw_data_dir, runList, output_dir=self.t1_data_dir, min_signal_thresh=min_signal_thresh, chanList=chanList)
+    def tier0(self, runList, chanList=None):
+        process_tier_0(self.raw_data_dir, runList, output_dir=self.t1_data_dir, chanList=chanList)
 
     def tier1(self, runList, num_threads):
         procs = self.get_processor_list()

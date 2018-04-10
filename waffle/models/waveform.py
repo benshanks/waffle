@@ -16,7 +16,7 @@ class WaveformModel(ModelBaseClass):
     """
     Specify the model in Python.
     """
-    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smooth=True):
+    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smooth=True, smoothing_type="gauss"):
 
         self.detector = detector
 
@@ -35,9 +35,17 @@ class WaveformModel(ModelBaseClass):
         ]
 
         self.do_smooth=do_smooth
+        self.smoothing_type = smoothing_type
         if do_smooth:
-            smooth_guess = 20
-            self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
+            if smoothing_type == "gaussian":
+                smooth_guess = 20
+                self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
+            elif smoothing_type == "skew":
+                self.detector.smoothing_type=1
+                smooth_guess = 20
+                skew_guess = 0
+                self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
+                self.params.append(Parameter("skew", "gaussian", mean=skew_guess, variance=5, lim_lo=-np.inf, lim_hi=np.inf))
 
         self.num_params = len(self.params)
 
@@ -83,27 +91,27 @@ class WaveformModel(ModelBaseClass):
 
     def make_waveform(self, data_len, wf_params, charge_type=None):
         r, z, phi, scale, maxt =  wf_params[:5]
+
+        smooth = None
+        skew=None
         if self.do_smooth:
-            smooth = wf_params[:6]
+            smooth = wf_params[5]
             if smooth < 0:
                 raise ValueError("Smooth should not be below 0 (value {})".format(smooth))
-                return None
-        else:
-            smooth = None
+            if self.smoothing_type == "skew":
+                skew = wf_params[6]
 
         # r = rad * np.cos(theta)
         # z = rad * np.sin(theta)
 
         if scale < 0:
             raise ValueError("Scale should not be below 0 (value {})".format(scale))
-            return None
 
         if not self.detector.IsInDetector(r, phi, z):
             raise ValueError("Point {},{},{} is outside detector.".format(r,phi,z))
-            return None
 
         if charge_type is None:
-                model = self.detector.MakeSimWaveform(r, phi, z, scale, maxt, self.align_percent, data_len, smoothing=smooth)
+                model = self.detector.MakeSimWaveform(r, phi, z, scale, maxt, self.align_percent, data_len, smoothing=smooth, skew=skew)
                 # model = self.detector.GetWaveform(r, phi, z, scale)
         elif charge_type == 1:
             model = self.detector.MakeWaveform(r, phi, z,1)[0,:]

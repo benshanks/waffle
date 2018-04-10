@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .electronics import HiPassFilterModel, LowPassFilterModel
+from .electronics import HiPassFilterModel, LowPassFilterModel, OvershootFilterModel
 # from .electronics import ElectronicsModel_old
 
 from .velocity import VelocityModel
@@ -12,3 +12,16 @@ from .detector import TrappingModel
 from .waveform import WaveformModel
 
 from .training import Model
+
+__all__ = [
+"HiPassFilterModel",
+"LowPassFilterModel",
+"OvershootFilterModel",
+#
+"VelocityModel",
+#
+"ImpurityModelEnds",
+"TrappingModel",
+#
+"WaveformModel"
+]

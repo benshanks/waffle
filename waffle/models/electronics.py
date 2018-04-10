@@ -35,15 +35,23 @@ class DigitalFilterBase(JointModelBase):
             den1 = self.zpk_to_ba(pmag, pphi)
             den2 = self.zpk_to_ba(pmag2, pphi2)
             num_ret = [ num, num]
-            det_ret = [den1, den2]
-        else:
+            den_ret = [den1, den2]
+        elif self.order == 2:
             pmag, pphi   = params[:2]
             if self.exp: pmag, pphi = self.exp_magphi(pmag, pphi)
 
             num_ret = num
-            det_ret = self.zpk_to_ba(pmag, pphi)
+            den_ret = self.zpk_to_ba(pmag, pphi)
+        elif self.order ==1:
+            assert len(params)==1
+            real_mag = params
 
-        return (num_ret, det_ret)
+            num_ret = self.default_num
+            den_ret = [1, -real_mag]
+        else:
+            raise NotImplementedError("Electronics Filter only works for first, second, and fourth order.")
+
+        return (num_ret, den_ret)
 
 
     def get_pz(self, params):
@@ -167,6 +175,30 @@ class HiPassFilterModel(DigitalFilterBase):
 
         if self.order==4: detector.hp_order = 4
         else: detector.hp_order = 2
+
+class OvershootFilterModel(JointModelBase):
+    def __init__(self):
+        self.num_params = 2
+
+        self.params = [
+            Parameter("pole", "gaussian", 2, 2, lim_lo=0, lim_hi=100),
+            Parameter("fraction", "uniform", lim_lo=0, lim_hi=0.25)
+        ]
+
+    def apply_to_detector(self, params, detector):
+        freq = 1E9
+
+        rc1_us, overshoot_frac  = params
+
+        rc1_dig= 1E-6 * (rc1_us) * freq
+        rc1_exp = np.exp(-1./rc1_dig)
+        num = [1,-1]
+        den = [1, -rc1_exp]
+
+        detector.overshoot = 1
+        detector.overshoot_frac = overshoot_frac
+        detector.overshoot_num = num
+        detector.overshoot_den = den
 
 #
 # class ElectronicsModel(JointModelBase):

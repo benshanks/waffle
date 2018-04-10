@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from pygama.waveform import Waveform
 from siggen import PPC
 
-from . import VelocityModel, LowPassFilterModel, HiPassFilterModel, ImpurityModel, ImpurityModelEnds, WaveformModel, TrappingModel
+from . import *
 
 max_float = sys.float_info.max
 
@@ -46,6 +46,8 @@ class JointModelBundle(object):
             model = HiPassFilterModel(order=self.conf["hp_order"])
         elif model_name == "LowPassFilterModel":
             model = LowPassFilterModel(order=self.conf["lp_order"], include_zeros=self.conf["lp_zeros"])
+        elif model_name ==  "OvershootFilterModel":
+            model = OvershootFilterModel()
         elif model_name ==  "TrappingModel":
             model = TrappingModel()
 
@@ -137,7 +139,8 @@ class Model(object):
         #   wf.windowed_wf = np.concatenate((wf.windowed_wf[:dec_idx], wf.windowed_wf[dec_idx::dec_factor]))
         #   wf.window_length = len(wf.windowed_wf)
 
-          self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector, do_smooth=wf_conf.do_smooth))
+          self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector,
+                        do_smooth=wf_conf.do_smooth, smoothing_type=wf_conf.smoothing_type))
 
           if doPrint:
               print( "wf %d length %d (entry %d from run %d)" % (wf_idx, wf.window_length, wf.entry_number, wf.runNumber))

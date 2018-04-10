@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+ #!/usr/local/bin/python
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,8 +18,8 @@ imp_grad = 1.2
 det.siggenInst.SetImpurityAvg(imp_avg, imp_grad)
 
 def main():
-    # poles(det)
-    zeros(det)
+    poles(det)
+    # zeros(det)
 
 
 def poles(det):
@@ -46,7 +46,7 @@ def poles(det):
     cmap = cm.get_cmap('viridis')
 
     phis = np.logspace(-20, -8, 100, base=np.pi)
-    mags = 1 - np.logspace(-6, -5, 100, base=10)
+    mags = 1 - np.logspace(-7.5, -6.5, 100, base=10)
     # phis = np.pi - phis
 
     w,h = get_freq_resp(mag, phi)
@@ -59,7 +59,10 @@ def poles(det):
         phi2=phi
         color = cmap( (mag2 - mags[0])/(mags[-1] - mags[0]) )
 
-        det.hp_den = em.zpk_to_ba(mag2, phi2)
+        det.hp_num = [[1,-2,1], [1,-2,1]]
+        det.hp_den = [em.zpk_to_ba(mag, phi), em.zpk_to_ba(mag2, phi2)]
+        det.hp_order=4
+
         wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, 1000, smoothing=20))
 
         try:
@@ -68,7 +71,7 @@ def poles(det):
         except TypeError:
             continue
 
-        w,h2 = get_freq_resp(mag, phi2)
+        w,h2 = get_freq_resp(mag, phi, p_mag2=mag2, p_phi2=phi2)
         ax[0,1].loglog( w, h2, color=color)
 
 
@@ -131,7 +134,7 @@ def zeros(det):
     plt.show()
 
 
-def get_freq_resp(p_mag, p_phi, z_mag=None, z_phi=None):
+def get_freq_resp(p_mag, p_phi, z_mag=None, z_phi=None, p_mag2=None, p_phi2=None):
     freq_samp = 1E9
     nyq_freq = 0.5*freq_samp
 
@@ -146,6 +149,12 @@ def get_freq_resp(p_mag, p_phi, z_mag=None, z_phi=None):
     w =np.logspace(-15, -7, 500, base=np.pi)
 
     w, h = signal.freqz(num, den1, worN=w)
+
+    if p_mag2 is not None:
+        den2 = em.zpk_to_ba(p_mag2, p_phi2)
+        w, h2 = signal.freqz(num, den2, worN=w)
+        h *= h2
+
     w/= (np.pi /nyq_freq)
 
     return w, np.abs(h)
