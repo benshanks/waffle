@@ -24,13 +24,13 @@ def main(chan, doPlot=False):
     # conf_name = "P42664A.conf"
 
     chan = int(chan)
-    directory = "2wf_2rc_{}".format(chan)
+    directory = "8wf_zero_{}".format(chan)
 
     wf_file = "training_data/chan{}_8wfs.npz".format(chan)
     conf_name = "{}.conf".format( chan_dict[chan] )
 
-    # wf_idxs = np.arange(0,8)
-    wf_idxs = [1,3]
+    wf_idxs = np.arange(0,8)
+    # wf_idxs = [1,3]
 
     # wf_file = "16wf_set_chan{}.npz".format(chan)
     # wf_idxs = np.arange(0,16,4)
@@ -48,15 +48,15 @@ def main(chan, doPlot=False):
         "smoothing_type":"gaussian"
     }
 
-    model_conf = {
-        "VelocityModel":{"include_beta":False},
-        "LowPassFilterModel": {"order":2},
-        "HiPassFilterModel": {"order":1},
-        "HiPassFilterModel": {"order":1},
-        "OvershootFilterModel":{},
-        "ImpurityModelEnds": {},
-        "TrappingModel":{},
-    }
+    model_conf = [
+        ("VelocityModel",       {"include_beta":False}),
+        ("LowPassFilterModel",  {"order":2}),
+        ("LowPassFilterModel",  {"order":2, "include_zeros":True}),
+        ("HiPassFilterModel",   {"order":2}),
+        ("OvershootFilterModel",{}),
+        ("ImpurityModelEnds",   {}),
+        ("TrappingModel",       {})
+    ]
 
     conf = FitConfiguration(
         conf_file,
