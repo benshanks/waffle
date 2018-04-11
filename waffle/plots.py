@@ -17,7 +17,8 @@ import scipy
 from scipy import signal
 
 from waffle.management import FitConfiguration
-from waffle.models import Model# #ElectronicsModel
+from waffle.models import *
+from waffle.models import Model
 
 colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown", "deeppink", "goldenrod", "lightsteelblue", "maroon", "violet", "lawngreen", "grey", "chocolate" ]
 
@@ -176,57 +177,37 @@ class TrainingPlotter(PlotterBase):
         # plt.ylim(-0.05, 1.05)
 
     def plot_tf(self):
-        em_hi_idx = self.model.joint_models.name_map["HiPassFilterModel"]
-        em_lo_idx = self.model.joint_models.name_map["LowPassFilterModel"]
-        em_hi = self.model.joint_models.models[em_hi_idx]
-        em_lo = self.model.joint_models.models[em_lo_idx]
-
         f, ax = plt.subplots(1,3, figsize=(15,6))
 
-        p = None
         for idx, row in self.plot_data.iterrows():
-            hi_data = row[em_hi.start_idx: em_hi.start_idx + em_hi.num_params].values
-            lo_data = row[em_lo.start_idx: em_lo.start_idx + em_lo.num_params].values
+            mod_idx = -1
+            for model in self.model.joint_models.models:
+                if not isinstance(model, DigitalFilterBase): continue
+                mod_idx +=1
 
-            hi_pz = em_hi.get_pz(hi_data)
-            lo_pz = em_lo.get_pz(lo_data)
+                data = row[model.start_idx: model.start_idx + model.num_params].values
 
-            for i, pole in enumerate(hi_pz["poles"]):
-                if i == 0: c="b"
-                else: c="g"
-                ax[0].scatter(np.real(pole), np.imag(pole), c=c, alpha=0.3)
+                pz = model.get_pz(data)
 
-            for zero in hi_pz["zeros"]:
-                ax[0].scatter(np.real(zero), np.imag(zero), c="r", alpha=0.3)
+                for i, pole in enumerate(pz["poles"]):
+                    if i == 0: c="b"
+                    else: c="g"
+                    ax[0].scatter(np.real(pole), np.imag(pole), color=colors[mod_idx], alpha=0.3)
 
-            for i, pole in enumerate(lo_pz["poles"]):
-                if i == 0: c="purple"
-                else: c="cyan"
-                ax[0].scatter(np.real(pole), np.imag(pole), c=c, alpha=0.3)
+                for i, zero in enumerate(pz["zeros"]):
+                    if i == 0: c="b"
+                    else: c="g"
+                    ax[0].scatter(np.real(zero), np.imag(zero), color=colors[mod_idx], alpha=0.3)
 
-            for zero in lo_pz["zeros"]:
-                ax[0].scatter(np.real(zero), np.imag(zero), c="r", alpha=0.3)
+                if isinstance(model, HiPassFilterModel):
+                    w_hi = np.logspace(-15, -6, 500, base=np.pi)
+                    (w_hi, h) = model.get_freqz(data, w_hi)
+                    p = ax[1].loglog( w_hi, np.abs(h), alpha = 0.2, color=colors[mod_idx])
 
-
-            w_hi = np.logspace(-15, -6, 500, base=np.pi)
-            w_lo = np.logspace(-6, 0, 500, base=np.pi)
-
-            if em_hi.order == 4:
-                (w_hi, h,  h2) = em_hi.get_freqz(hi_data, w_hi)
-                p2 = ax[1].loglog( w_hi, np.abs(h2), alpha = 0.2, color=colors[3])
-                ax[1].loglog( w_hi, np.abs(h2*h), alpha = 0.2, color="k")
-            else:
-                (w_hi, h) = em_hi.get_freqz(hi_data, w_hi)
-
-            if em_lo.order == 4:
-                (w_lo, h3, h4) = em_lo.get_freqz(lo_data, w_lo)
-                p4 = ax[2].loglog( w_lo, np.abs(h4), alpha = 0.2, color=colors[4])
-                ax[2].loglog( w_lo, np.abs(h3*h4), alpha = 0.2, color="k")
-            else:
-                (w_lo, h3) = em_lo.get_freqz(lo_data, w_lo)
-
-            p = ax[1].loglog( w_hi, np.abs(h), alpha = 0.2, color=colors[0])
-            p3 = ax[2].loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[1])
+                elif isinstance(model, LowPassFilterModel):
+                    w_lo = np.logspace(-6, 0, 500, base=np.pi)
+                    (w_lo, h3) = model.get_freqz(data, w_lo)
+                    p3 = ax[2].loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[mod_idx])
 
 
         an = np.linspace(0,np.pi,200)

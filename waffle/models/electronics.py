@@ -6,7 +6,7 @@ from ._parameterbase import JointModelBase, Parameter
 from siggen.electronics import DigitalFilter, GretinaOvershootFilter
 
 class DigitalFilterBase(JointModelBase):
-    def __init__(self, detector, order, include_zeros):
+    def __init__(self, detector, order, include_zeros, pmag_lims, pphi_lims):
         assert (order==1 or order==2)
         self.order = order
         self.include_zeros = include_zeros
@@ -17,23 +17,49 @@ class DigitalFilterBase(JointModelBase):
         freq_samp = 1E9
         self.nyq_freq = 0.5*freq_samp
 
+        if self.order == 1:
+            self.params = [
+                Parameter("pole_mag", "uniform", lim_lo=pmag_lims[0], lim_hi=pmag_lims[-1]),
+            ]
+
+        elif self.order == 2:
+            self.params = [
+                #I know from experience that the lowpass poles are near (0,1)
+                #(makes sense cause the amplitude response should fall off near nyquist freq)
+                #just go ahead and shove the priors up near there
+                Parameter("pole_mag", "uniform", lim_lo=pmag_lims[0], lim_hi=pmag_lims[-1]),
+                Parameter("pole_phi", "uniform", lim_lo=pphi_lims[0], lim_hi=pphi_lims[-1]),
+            ]
+
     def exp_magphi(self, mag, phi=0):
         if phi == 0: return [1. - 10.**mag]
         return (1. - 10.**mag, np.pi**phi)
 
     def get_pz(self, params):
+        self.apply_to_detector(params, None)
 
         return_dict = {
-            "poles":self.digital_filter.poles,
-            "zeros":self.digital_filter.zeros
+            "poles":[],
+            "zeros":[]
         }
+
+        try:
+            return_dict["poles"].append(self.digital_filter.poles)
+        except AttributeError:
+            pass
+
+        try:
+            return_dict["zeros"].append(self.digital_filter.zeros)
+        except AttributeError:
+            pass
+
 
         return return_dict
 
     def apply_to_detector(self, params, detector):
         pole_params = params[:self.order]
         if self.exp: pole_params = self.exp_magphi(*pole_params)
-                
+
         self.digital_filter.set_poles(*pole_params)
 
         if self.include_zeros:
@@ -41,43 +67,34 @@ class DigitalFilterBase(JointModelBase):
             self.digital_filter.set_zeros(*zero_params)
 
     def get_freqz(self, params, w):
+        self.apply_to_detector(params, None)
         # w=np.logspace(-15, -5, 500, base=np.pi)
 
-        num, den = self.get_num_den(params)
+        num, den = self.digital_filter.num, self.digital_filter.den
 
-        if self.order == 2 :
-            if np.sum(num) != 0: num /= np.sum(num)/np.sum(den)
-            w, h = signal.freqz(num, den, worN=w )
-            w/= (np.pi /self.nyq_freq)
-            return w, h
+        if np.sum(num) != 0: num /= np.sum(num)/np.sum(den)
+        w, h = signal.freqz(num, den, worN=w )
+        w/= (np.pi /self.nyq_freq)
+        return w, h
 
 
 class LowPassFilterModel(DigitalFilterBase):
-    def __init__(self,detector, order=2, include_zeros=False):
-        super().__init__(detector, order, include_zeros)
+    def __init__(self,detector, order=2, include_zeros=False, pmag_lims=None, pphi_lims=None):
+        if pmag_lims is None: pmag_lims = [0.9,1]
+        if pphi_lims is None: pphi_lims = [0,0.1]
+
+        super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims)
         self.exp = False
 
-        if self.order == 1:
-            self.params = [
-                Parameter("pole_mag", "uniform", lim_lo=0, lim_hi=1),
-            ]
+        if order == 1:
             if self.include_zeros:
                 self.params.append(
                     Parameter("zero_mag", "uniform", lim_lo=-10, lim_hi=10)
                 )
             else:
                 self.digital_filter.num = [1,1]
-
-        elif self.order == 2:
-            self.params = [
-                #I know from experience that the lowpass poles are near (0,1)
-                #(makes sense cause the amplitude response should fall off near nyquist freq)
-                #just go ahead and shove the priors up near there
-                Parameter("pole_mag", "uniform", lim_lo=0.9, lim_hi=1),
-                Parameter("pole_phi", "uniform", lim_lo=0, lim_hi=0.1),
-            ]
-
-            if self.include_zeros:
+        else:
+            if include_zeros:
                 self.params.append(
                     Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
                 self.params.append(
@@ -87,30 +104,21 @@ class LowPassFilterModel(DigitalFilterBase):
                 self.digital_filter.num = [1,2,1]
 
 class HiPassFilterModel(DigitalFilterBase):
-    def __init__(self, detector, order=2, include_zeros=False):
-        super().__init__(detector, order, include_zeros)
+    def __init__(self, detector, order=2, include_zeros=False, pmag_lims=None, pphi_lims=None):
         self.exp = True
+        if pmag_lims is None: pmag_lims = [-6,-1]
+        if pphi_lims is None: pphi_lims = [-20,-2]
 
-        if self.order == 1:
-            self.params = [
-                Parameter("pole_mag", "uniform", lim_lo=-6, lim_hi=-1),
-            ]
+        super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims)
+
+        if order == 1:
             if self.include_zeros:
                 self.params.append(
                     Parameter("zero_mag", "uniform", lim_lo=-10, lim_hi=10)
                 )
             else:
                 self.digital_filter.num = [1,-1]
-
-        elif self.order == 2:
-            self.params = [
-                #I know from experience that the lowpass poles are near (0,1)
-                #(makes sense cause the amplitude response should fall off near nyquist freq)
-                #just go ahead and shove the priors up near there
-                Parameter("pole_mag", "uniform", lim_lo=-6, lim_hi=-1),
-                Parameter("pole_phi", "uniform", lim_lo=-20, lim_hi=-2),
-            ]
-
+        else:
             if include_zeros:
                 self.params.append(
                     Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))

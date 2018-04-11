@@ -21,15 +21,14 @@ class JointModelBundle(object):
         self.models = []
         self.index_map = {}
         self.start_map = {}
-        self.name_map={}
 
         self.num_params = 0
         i=0
-        for model_idx, model_name in enumerate(self.conf.keys()):
-            model = self.append(model_name, self.conf[model_name])
+
+        for model_idx, (model_name, model_conf) in enumerate(self.conf):
+            model = self.append(model_name, model_conf)
             self.num_params += model.num_params
             self.start_map[model_idx] = i
-            self.name_map[model_name] = model_idx
             model.start_idx = i
 
             for j in range(model.num_params):
