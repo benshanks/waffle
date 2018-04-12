@@ -4,20 +4,27 @@ import pickle
 import dnest4
 from multiprocessing import Pool, cpu_count
 
-from ..models import Model
+from ..models import Model, PulserTrainingModel
 
-def init_parallelization(conf):
+def init_parallelization(conf, model_type):
     global model
-    model = Model( conf,)
+    if model_type=="Model":
+        model = Model( conf)
+    elif model_type=="PulserTrainingModel":
+        model = PulserTrainingModel( conf)
+
 def WaveformLogLikeStar(a_b):
   return model.calc_wf_likelihood(*a_b)
 
 class LocalFitManager():
     '''Does the fit using one machine -- either multicore or single-threaded'''
 
-    def __init__(self, fit_configuration, num_threads=None):
+    def __init__(self, fit_configuration, num_threads=None, model_type="Model"):
+        if model_type=="Model":
+            self.model = Model( fit_configuration, fit_manager=self)
+        elif model_type=="PulserTrainingModel":
+            self.model = PulserTrainingModel( fit_configuration, fit_manager=self)
 
-        self.model = Model( fit_configuration, fit_manager=self)
         self.num_waveforms = self.model.num_waveforms
         self.num_det_params = self.model.num_det_params
         self.num_wf_params = self.model.num_wf_params#fit_configuration.num_wf_params
@@ -29,9 +36,9 @@ class LocalFitManager():
         self.num_threads = num_threads
 
         if num_threads > 1:
-            self.pool = Pool(num_threads, initializer=init_parallelization, initargs=(fit_configuration,))
+            self.pool = Pool(num_threads, initializer=init_parallelization, initargs=(fit_configuration,model_type))
         else:
-            init_parallelization(fit_configuration)
+            init_parallelization(fit_configuration,model_type)
 
     def calc_likelihood(self, params):
         num_det_params = self.num_det_params

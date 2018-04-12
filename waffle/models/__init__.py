@@ -14,6 +14,8 @@ from .detector import TrappingModel
 
 from .waveform import WaveformModel
 
+from .pulser import PulserGenerator, PulserModel, PulserTrainingModel
+
 from .training import Model
 
 __all__ = [

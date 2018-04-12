@@ -18,7 +18,7 @@ from scipy import signal
 
 from waffle.management import FitConfiguration
 from waffle.models import *
-from waffle.models import Model
+from waffle.models import Model, PulserTrainingModel
 
 colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown", "deeppink", "goldenrod", "lightsteelblue", "maroon", "violet", "lawngreen", "grey", "chocolate" ]
 
@@ -26,6 +26,7 @@ colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown"
 class PlotterBase():
     def __init__(self, result_directory, num_samples, sample_dec=1):
         self.parse_samples("sample.txt", result_directory, num_samples, sample_dec)
+        self.width = 18
 
     def parse_samples(self, sample_file_name, directory, plotNum, sample_dec=1):
 
@@ -47,11 +48,16 @@ class PlotterBase():
 
 
 class TrainingPlotter(PlotterBase):
-    def __init__(self, result_directory, num_samples, sample_dec=1):
+    def __init__(self, result_directory, num_samples, sample_dec=1, model_type="Model"):
         super().__init__(result_directory, num_samples, sample_dec)
 
         configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
-        self.model = Model(configuration)
+
+        if model_type == "Model":
+            self.model = Model(configuration)
+        elif model_type == "PulserTrainingModel":
+            self.model = PulserTrainingModel(configuration)
+
         self.num_wf_params = self.model.num_wf_params
 
         # end_idx = 10000
@@ -62,7 +68,7 @@ class TrainingPlotter(PlotterBase):
 
         bad_wf_thresh = 1000
 
-        plt.figure(figsize=(20,8))
+        plt.figure(figsize=(self.width,8))
         gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
         ax0 = plt.subplot(gs[0])
         ax1 = plt.subplot(gs[1], sharex=ax0)
@@ -122,14 +128,14 @@ class TrainingPlotter(PlotterBase):
                 #     print ("under: {}".format(lo_pz))
 
 
-        ax0.set_ylim(-20, np.amax([wf.amplitude for wf in model.wfs])*1.1)
-        ax0.axhline(y=0,color="black", ls=":")
+        ax0.set_ylim(-20, np.amax([ np.amax(wf.data) for wf in model.wfs])*1.1)
+        ax1.axhline(y=0,color="black", ls=":")
         # ax0.axvline(x=model.conf.align_idx*10,color="black", ls=":")
         # ax1.axvline(x=model.conf.align_idx*10,color="black", ls=":")
         # ax1.set_ylim(-bad_wf_thresh, bad_wf_thresh)
 
         avg_resid = resid_arr/len(model.wfs)/len(data.index)
-        plt.figure(figsize=(6.5,4))
+        plt.figure(figsize=(self.width,4))
         plt.plot(avg_resid, ls="steps", color = "blue")
         plt.axhline(y=0,color="black", ls=":")
         plt.xlabel("Sample number [10s of ns]")
@@ -140,7 +146,7 @@ class TrainingPlotter(PlotterBase):
         data = self.plot_data
         model = self.model
 
-        plt.figure(figsize=(20,8))
+        plt.figure(figsize=(self.width,8))
         plt.xlabel("Digitizer Time [ns]")
 
         num_det_params = model.num_det_params
@@ -177,42 +183,63 @@ class TrainingPlotter(PlotterBase):
         # plt.ylim(-0.05, 1.05)
 
     def plot_tf(self):
-        f, ax = plt.subplots(1,3, figsize=(15,6))
+        plt.figure(figsize=(self.width,8))
+        gs = gridspec.GridSpec(2, 3, height_ratios=[1, 1])
+        ax0 = plt.subplot(gs[:,0])
+        ax1 = plt.subplot(gs[0,1])
+        ax2 = plt.subplot(gs[0,2])
+
+        ax_decay_rc = plt.subplot(gs[1,1])
+        ax_square = plt.subplot(gs[1,2])
 
         for idx, row in self.plot_data.iterrows():
             mod_idx = -1
+
+            #show the square response for the whole thing
+            square = np.zeros(1000)
+            square[100:] = 1
+
             for model in self.model.joint_models.models:
                 if not isinstance(model, DigitalFilterBase): continue
                 mod_idx +=1
 
                 data = row[model.start_idx: model.start_idx + model.num_params].values
 
+                model.apply_to_detector(data, None)
+                square = model.digital_filter.apply_to_signal(square)
+
                 pz = model.get_pz(data)
 
                 for i, pole in enumerate(pz["poles"]):
-                    if i == 0: c="b"
-                    else: c="g"
-                    ax[0].scatter(np.real(pole), np.imag(pole), color=colors[mod_idx], alpha=0.3)
+                    ax0.scatter(np.real(pole), np.imag(pole), color=colors[mod_idx], alpha=0.3)
 
                 for i, zero in enumerate(pz["zeros"]):
-                    if i == 0: c="b"
-                    else: c="g"
-                    ax[0].scatter(np.real(zero), np.imag(zero), color=colors[mod_idx], alpha=0.3)
+                    ax0.scatter(np.real(zero), np.imag(zero), color=colors[mod_idx], alpha=0.3)
 
                 if isinstance(model, HiPassFilterModel):
                     w_hi = np.logspace(-15, -6, 500, base=np.pi)
                     (w_hi, h) = model.get_freqz(data, w_hi)
-                    p = ax[1].loglog( w_hi, np.abs(h), alpha = 0.2, color=colors[mod_idx])
+                    p = ax1.loglog( w_hi, np.abs(h), alpha = 0.2, color=colors[mod_idx])
+
+                    #Pick out the effective RC constant of the decay
+                    decay_const = -1/np.log(-1*model.digital_filter.den[-1])/1E9/1E-6
+                    ax_decay_rc.axvline(decay_const, alpha=0.2, color=colors[mod_idx])
 
                 elif isinstance(model, LowPassFilterModel):
                     w_lo = np.logspace(-6, 0, 500, base=np.pi)
                     (w_lo, h3) = model.get_freqz(data, w_lo)
-                    p3 = ax[2].loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[mod_idx])
+                    p3 = ax2.loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[mod_idx])
+
+            ax_square.plot(square, color="b", alpha=0.2)
 
 
         an = np.linspace(0,np.pi,200)
-        ax[0].plot(np.cos(an), np.sin(an), c="k")
-        ax[0].axis("equal")
+        ax0.plot(np.cos(an), np.sin(an), c="k")
+        ax0.axis("equal")
+
+        ax_decay_rc.set_xscale("log")
+        ax_decay_rc.set_xlabel("RC constant (us)")
+
 
     def plot_imp(self):
         im = self.model.imp_model
@@ -244,7 +271,7 @@ class TrainingPlotter(PlotterBase):
         #overlay the grid of calculated points
 
     def plot_trace(self):
-        f, ax = plt.subplots(self.model.num_det_params, 1, figsize=(14,10), sharex=True)
+        f, ax = plt.subplots(self.model.num_det_params, 1, figsize=(self.width,10), sharex=True)
         for i in range(self.model.num_det_params):
             tf_data = self.plot_data[i]
             ax[i].plot(tf_data, ls="steps")
@@ -255,12 +282,11 @@ class TrainingPlotter(PlotterBase):
         plt.savefig("pairplot.png")
 
     def plot_waveform_trace(self):
-        f, ax = plt.subplots(self.num_wf_params, 1, figsize=(14,10), sharex=True)
+        f, ax = plt.subplots(self.num_wf_params, 1, figsize=(self.width,10), sharex=True)
         for i in range(self.num_wf_params):
             for j in range (self.model.num_waveforms):
                 tf_data = self.plot_data[self.model.num_det_params + self.num_wf_params*j+i]
                 ax[i].plot(tf_data, color=colors[j], ls="steps")
-
 
 class WaveformFitPlotter(PlotterBase):
 
@@ -270,7 +296,7 @@ class WaveformFitPlotter(PlotterBase):
         self.wf_model = wf_model
 
     def plot_trace(self):
-        f, ax = plt.subplots(self.wf_model.num_params, 1, figsize=(14,10), sharex=True)
+        f, ax = plt.subplots(self.wf_model.num_params, 1, figsize=(self.width,10), sharex=True)
         for i in range(self.wf_model.num_params):
             tf_data = self.plot_data[i]
             ax[i].plot(tf_data)
@@ -281,7 +307,7 @@ class WaveformFitPlotter(PlotterBase):
         wf = wf_model.target_wf
         wf_idx = 0
 
-        plt.figure(figsize=(20,8))
+        plt.figure(figsize=(self.width,8))
         gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
         ax0 = plt.subplot(gs[0])
         ax1 = plt.subplot(gs[1], sharex=ax0)
