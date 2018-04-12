@@ -3,12 +3,21 @@ import numpy as np
 import numpy.random as rng
 from scipy import signal
 from scipy.interpolate import interp1d
+from copy import copy
 import dnest4
 
 from pygama.waveform import Waveform
 
-from ._parameterbase import ModelBaseClass, Parameter
+from ._parameterbase import ModelBaseClass, Parameter, JointModelBase
 from ._model_bundle import JointModelBundle
+
+class PulserEnergyModel(JointModelBase):
+    def __init__(self, energy_guess):
+        self.params = [
+            Parameter("energy", "gaussian", energy_guess, 0.1*energy_guess, lim_lo=0.5*energy_guess, lim_hi=1.5*energy_guess),
+        ]
+    def apply_to_detector(self, params, detector):
+        detector.energy = params
 
 class PulserGenerator(object):
 
@@ -136,7 +145,8 @@ class PulserModel(ModelBaseClass):
             t_align, energy =  wf_params
             self.pg.energy = energy
         else:
-            t_align =  wf_params
+            assert len(wf_params) == 1
+            t_align =  wf_params[:]
 
         pulser_model = self.pg.make_pulser(t_align, self.align_adc,  data_len)
 
@@ -148,7 +158,7 @@ class PulserModel(ModelBaseClass):
         # model_err = 0.57735027 * wf.baselineRMS
         model_err = 2.5 #TODO: get this from the waveform itself
         data_len = len(data)
-        model = self.make_waveform(data_len, wf_params, )
+        model = self.make_waveform(data_len, wf_params)
 
         if model is None:
             ln_like = -np.inf
@@ -168,6 +178,7 @@ class PulserTrainingModel(object):
     def __init__(self, fit_configuration, fit_manager=None):
 
         self.conf = fit_configuration
+        model_conf = copy(self.conf.model_conf)
         self.fit_manager = fit_manager
 
         #Setup detector and waveforms
@@ -178,7 +189,10 @@ class PulserTrainingModel(object):
         self.changed_wfs = np.zeros(self.num_waveforms)
 
         #Set up all the models...
-        self.joint_models = JointModelBundle(self.conf.model_conf, self.pg)
+        if self.conf.joint_energy:
+            model_conf.append((PulserEnergyModel, {"energy_guess":self.wfs[0].windowed_wf.max()} ) )
+
+        self.joint_models = JointModelBundle(model_conf, self.pg)
         self.num_det_params = self.joint_models.num_params
 
     def setup_waveforms(self, wf_conf, doPrint=False):
@@ -201,7 +215,7 @@ class PulserTrainingModel(object):
           full_samples = wf_conf.align_idx
           wf.window_waveform(time_point=wf_conf.align_percent, early_samples=wf_conf.align_idx, num_samples=total_samples, method="value")
 
-          self.wf_models.append(PulserModel(wf, self.pg, align_adc=wf_conf.align_percent, align_idx = wf_conf.align_idx, include_energy=True))
+          self.wf_models.append(PulserModel(wf, self.pg, align_adc=wf_conf.align_percent, align_idx = wf_conf.align_idx, include_energy=(not self.conf.joint_energy)))
 
         self.output_wf_length = np.int( wf_conf.num_samples + 1 )
 
@@ -212,24 +226,10 @@ class PulserTrainingModel(object):
 
     def from_prior(self):
         wf_params = np.concatenate([ wf.get_prior()[:] for wf in self.wf_models ])
-
         prior = np.concatenate([
               self.joint_models.get_prior(), wf_params
             ])
 
-        if False:#print out the prior to make sure i know what i'm doing
-            import matplotlib.pyplot as plt
-            plt.figure()
-
-            self.apply_detector_params(prior[:self.num_det_params])
-            for wf_idx, wf_model in enumerate(self.wf_models):
-                print("waveform number {}".format(wf_idx))
-                p = plt.plot(wf_model.target_wf.windowed_wf)
-                wf_params = prior[self.num_det_params + wf_idx*self.num_wf_params: self.num_det_params + (wf_idx+1)*self.num_wf_params]
-                fit_wf = wf_model.make_waveform( self.output_wf_length,   wf_params)
-                plt.plot(fit_wf, c=p[0].get_color())
-            plt.show()
-            exit()
         return prior
 
     def get_wf_params(self, params, wf_idx):

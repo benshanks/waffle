@@ -38,8 +38,8 @@ class FitConfiguration(object):
 
         loadSavedConfig=False,
 
-        time_step_calc=1
-
+        time_step_calc=1,
+        **kwargs
     ):
 
         self.siggen_conf_file=conf_file
@@ -51,6 +51,8 @@ class FitConfiguration(object):
 
         self.time_step_calc=time_step_calc
 
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
         if loadSavedConfig:
             self.load_config(directory)

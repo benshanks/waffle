@@ -3,6 +3,7 @@ import numpy as np
 import numpy.random as rng
 
 from . import *
+from ._parameterbase import JointModelBase
 
 class JointModelBundle(object):
     def __init__(self, conf, detector):
@@ -31,7 +32,7 @@ class JointModelBundle(object):
         if model_name=="VelocityModel":
             model = VelocityModel(**model_conf)
         elif model_name=="ImpurityModelEnds":
-            model = ImpurityModelEnds(self.detector.imp_avg_lims, self.detector.imp_grad_lims, self.detector.detector_length, **model_conf)
+            model = ImpurityModelEnds(self.detector, **model_conf)
         elif model_name == "HiPassFilterModel":
             model = HiPassFilterModel(self.detector, **model_conf)
         elif model_name == "LowPassFilterModel":
@@ -40,6 +41,10 @@ class JointModelBundle(object):
             model = OvershootFilterModel(self.detector, **model_conf)
         elif model_name ==  "TrappingModel":
             model = TrappingModel(**model_conf)
+        elif issubclass(model_name, JointModelBase):
+            model = model_name(**model_conf)
+        else:
+            raise ValueError("model_name {} is not a valid model".format(model_name))
 
         self.models.append(model)
         return model
