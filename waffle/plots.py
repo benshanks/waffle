@@ -275,6 +275,17 @@ class TrainingPlotter(PlotterBase):
         for i in range(self.model.num_det_params):
             tf_data = self.plot_data[i]
             ax[i].plot(tf_data, ls="steps")
+
+            #corresponding model
+            model_idx = self.model.joint_models.index_map[i]
+            param_model = self.model.joint_models.models[model_idx]
+
+            model_param_idx = i - param_model.start_idx
+            param = param_model.params[model_param_idx]
+            ax[i].axhline(param.lim_lo,c="k", ls=":")
+            ax[i].axhline(param.lim_hi,c="k", ls=":")
+            ax[i].set_ylabel(param.name)
+
         # plt.xlim(0, len(tf_data))
 
     def plot_detector_pair(self):
