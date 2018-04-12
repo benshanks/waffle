@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from pygama.waveform import Waveform
 from siggen import PPC
 
-
+from .waveform import WaveformModel
 from ._model_bundle import JointModelBundle
 
 max_float = sys.float_info.max
