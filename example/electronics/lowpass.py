@@ -8,8 +8,10 @@ from scipy import signal
 from scipy.ndimage.filters import gaussian_filter1d
 from matplotlib import cm
 
-from waffle.models.electronics import LowPassFilterModel
-em = LowPassFilterModel()
+from siggen.electronics import DigitalFilter
+from pygama.filters import rc_decay
+
+wf_length=1000
 
 def main():
     # det = Detector("GEM", "config_files/ortec4b.config", verbose=False)
@@ -18,16 +20,53 @@ def main():
     imp_avg = -2
     imp_grad = 1.2
     det.siggenInst.SetImpurityAvg(imp_avg, imp_grad)
-    det.hp_order=0
-
 
     # freq_resp(det)
     # poles(det)
-    zeros(det)
+    # zeros(det)
+    aliasing_filter(det)
     plt.show()
 
-def zeros(det):
+def aliasing_filter(det):
+    '''
+    We know there's a 1-pole antialiasing filter at ~1/(2 * 49.9 * 33E-12) Hz
+    How big a difference should that make?
+    '''
 
+    lowpass = DigitalFilter(2)
+    lowpass.num = [1,2,1]
+    lowpass.set_poles(0.975, 0.007)
+
+    hipass = DigitalFilter(1)
+    hipass.num, hipass.den = rc_decay(72, 1E9)
+
+    det.AddDigitalFilter(lowpass)
+    det.AddDigitalFilter(hipass)
+
+    wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, wf_length, smoothing=20))
+    wf_compare = np.copy(wf_proc)
+
+    f, ax = plt.subplots(2,1,figsize=(15,8))
+    ax[0].plot (wf_compare,  color="r")
+
+    lopass2 = DigitalFilter(1)
+    lopass2.num = [1,1]
+    rc = (2 * 49.9 * 33E-12)
+    lopass2.den = [1, -np.exp( -1./rc/1E9)]
+    det.AddDigitalFilter(lopass2)
+
+    wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, wf_length, smoothing=20))
+
+    ax[0].plot (wf_proc,  color="g")
+    ax[1].plot (wf_compare-wf_proc,  color="g")
+
+    plt.show()
+    exit()
+
+
+
+
+def zeros(det):
 
     phi = 0.007
     mag = 0.975

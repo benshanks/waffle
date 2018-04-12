@@ -8,16 +8,64 @@ from siggen import PPC
 from scipy import signal
 from scipy.ndimage.filters import gaussian_filter1d
 
+from pygama.filters import rc_decay
 from siggen.electronics import DigitalFilter
 
-det = PPC( os.path.join(os.environ["DATADIR"],  "siggen", "config_files", "bege.config"), wf_padding=100)
+wf_length = 1000
+det = PPC( os.path.join(os.environ["DATADIR"],  "siggen", "config_files", "bege.config"), wf_padding=1000, maxWfOutputLength=wf_length)
 imp_avg = -2
 imp_grad = 1.2
 det.siggenInst.SetImpurityAvg(imp_avg, imp_grad)
 
+
+
 def main():
-    poles(det)
+    # poles(det)
     # zeros(det)
+    two_rc(det)
+
+def two_rc(det):
+    '''
+    WHATS IT LOOK LIKE WITH A 72 US AND 2 MS DECAY?
+    '''
+
+    lowpass = DigitalFilter(2)
+    lowpass.num = [1,2,1]
+    lowpass.set_poles(0.975, 0.007)
+
+    hipass = DigitalFilter(1)
+    hipass.num, hipass.den = rc_decay(82, 1E9)
+
+    det.AddDigitalFilter(lowpass)
+    det.AddDigitalFilter(hipass)
+
+    wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, wf_length, smoothing=20))
+    wf_compare = np.copy(wf_proc)
+
+    f, ax = plt.subplots(2,1,figsize=(15,8))
+    ax[0].plot (wf_compare,  color="r")
+
+    # hipass2 = DigitalFilter(1)
+    # hipass2.num, hipass2.den = rc_decay(2000, 1E9)
+    # hipass.num, hipass.den = rc_decay(74.75, 1E9)
+    # det.AddDigitalFilter(hipass2)
+
+    mag = 1.-10.**-5.22
+    phi = np.pi**-13.3
+    det.RemoveDigitalFilter(hipass)
+    hipass = DigitalFilter(2)
+    hipass.num = [1,-2,1]
+    hipass.set_poles(mag, phi)
+    det.AddDigitalFilter(hipass)
+
+    wf_proc = np.copy(det.MakeSimWaveform(25, 0, 25, 1, 125, 0.95, wf_length, smoothing=20))
+
+    ax[0].plot (wf_proc,  color="g")
+    ax[1].plot (wf_compare-wf_proc,  color="g")
+
+    plt.show()
+    exit()
+
 
 
 def poles(det):
