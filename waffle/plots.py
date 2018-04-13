@@ -200,7 +200,7 @@ class TrainingPlotter(PlotterBase):
             square[100:] = 1
 
             for model in self.model.joint_models.models:
-                if not isinstance(model, DigitalFilterBase): continue
+                if not isinstance(model, DigitalFilterModel): continue
                 mod_idx +=1
 
                 data = row[model.start_idx: model.start_idx + model.num_params].values

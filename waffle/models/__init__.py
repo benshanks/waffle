@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .electronics import DigitalFilterBase
+from .electronics import DigitalFilterModel
 from .electronics import HiPassFilterModel
 from .electronics import LowPassFilterModel
 from .electronics import OvershootFilterModel
@@ -19,7 +19,7 @@ from .pulser import PulserGenerator, PulserModel, PulserTrainingModel
 from .training import Model
 
 __all__ = [
-"DigitalFilterBase",
+"DigitalFilterModel",
 "HiPassFilterModel",
 "LowPassFilterModel",
 "OvershootFilterModel",

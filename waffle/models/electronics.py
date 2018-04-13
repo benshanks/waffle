@@ -5,9 +5,15 @@ from scipy import signal
 from ._parameterbase import JointModelBase, Parameter
 from siggen.electronics import DigitalFilter, GretinaOvershootFilter
 
-class DigitalFilterBase(JointModelBase):
-    def __init__(self, detector, order, include_zeros, pmag_lims, pphi_lims):
+class DigitalFilterModel(JointModelBase):
+    def __init__(self, detector, order, include_zeros, pmag_lims=None, pphi_lims=None, zmag_lims=None, zphi_lims=None):
         assert (order==1 or order==2)
+
+        if pmag_lims is None: pmag_lims = [0,1]
+        if zmag_lims is None: zmag_lims = [0,1]
+        if pphi_lims is None: pphi_lims = [0,np.pi]
+        if zphi_lims is None: zphi_lims = [0,np.pi]
+
         self.order = order
         self.include_zeros = include_zeros
 
@@ -22,6 +28,11 @@ class DigitalFilterBase(JointModelBase):
                 Parameter("pole_mag", "uniform", lim_lo=pmag_lims[0], lim_hi=pmag_lims[-1]),
             ]
 
+            if include_zeros:
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=zmag_lims[0], lim_hi=zmag_lims[-1]),
+                )
+
         elif self.order == 2:
             self.params = [
                 #I know from experience that the lowpass poles are near (0,1)
@@ -30,6 +41,14 @@ class DigitalFilterBase(JointModelBase):
                 Parameter("pole_mag", "uniform", lim_lo=pmag_lims[0], lim_hi=pmag_lims[-1]),
                 Parameter("pole_phi", "uniform", lim_lo=pphi_lims[0], lim_hi=pphi_lims[-1]),
             ]
+
+            if include_zeros:
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=zmag_lims[0], lim_hi=zmag_lims[-1]),
+                )
+                self.params.append(
+                    Parameter("zero_mag", "uniform", lim_lo=zphi_lims[0], lim_hi=zphi_lims[-1]),
+                )
 
     def exp_magphi(self, mag, phi=0):
         if phi == 0: return [1. - 10.**mag]
@@ -78,55 +97,35 @@ class DigitalFilterBase(JointModelBase):
         return w, h
 
 
-class LowPassFilterModel(DigitalFilterBase):
-    def __init__(self,detector, order=2, include_zeros=False, pmag_lims=None, pphi_lims=None):
+class LowPassFilterModel(DigitalFilterModel):
+    def __init__(self,detector, order=2, include_zeros=False, pmag_lims=None, pphi_lims=None, zmag_lims=None, zphi_lims=None):
         if pmag_lims is None: pmag_lims = [0.9,1]
         if pphi_lims is None: pphi_lims = [0,0.1]
+        # if zmag_lims is None: zmag_lims = [0.9,1]
+        # if zphi_lims is None: zphi_lims = [0,0.5]
 
-        super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims)
+        super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims, zmag_lims, zphi_lims)
         self.exp = False
 
-        if order == 1:
-            if self.include_zeros:
-                self.params.append(
-                    Parameter("zero_mag", "uniform", lim_lo=-10, lim_hi=10)
-                )
-            else:
-                self.digital_filter.num = [1,1]
-        else:
-            if include_zeros:
-                self.params.append(
-                    Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
-                self.params.append(
-                    Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=0.5)
-                )
-            else:
-                self.digital_filter.num = [1,2,1]
+        if not self.include_zeros:
+            if order == 1:self.digital_filter.num = [1,1]
+            else: self.digital_filter.num = [1,2,1]
 
-class HiPassFilterModel(DigitalFilterBase):
+
+class HiPassFilterModel(DigitalFilterModel):
     def __init__(self, detector, order=2, include_zeros=False, pmag_lims=None, pphi_lims=None):
+        assert include_zeros == False
+
         self.exp = True
         if pmag_lims is None: pmag_lims = [-6,-1]
         if pphi_lims is None: pphi_lims = [-20,-2]
 
-        super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims)
+        super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims, None, None)
 
         if order == 1:
-            if self.include_zeros:
-                self.params.append(
-                    Parameter("zero_mag", "uniform", lim_lo=-10, lim_hi=10)
-                )
-            else:
-                self.digital_filter.num = [1,-1]
+            self.digital_filter.num = [1,-1]
         else:
-            if include_zeros:
-                self.params.append(
-                    Parameter("zero_mag", "uniform", lim_lo=0.9, lim_hi=2))
-                self.params.append(
-                    Parameter("zero_phi", "uniform", lim_lo=0, lim_hi=0.5)
-                )
-            else:
-                self.digital_filter.num = [1,-2,1]
+            self.digital_filter.num = [1,-2,1]
 
 
 class OvershootFilterModel(JointModelBase):
