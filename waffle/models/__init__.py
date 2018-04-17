@@ -4,6 +4,8 @@ from .electronics import DigitalFilterModel
 from .electronics import HiPassFilterModel
 from .electronics import LowPassFilterModel
 from .electronics import OvershootFilterModel
+from .electronics import OscillationFilterModel
+from .electronics import AntialiasingFilterModel
 # from .electronics import ElectronicsModel_old
 
 from .velocity import VelocityModel
@@ -23,6 +25,8 @@ __all__ = [
 "HiPassFilterModel",
 "LowPassFilterModel",
 "OvershootFilterModel",
+"OscillationFilterModel",
+"AntialiasingFilterModel",
 #
 "VelocityModel",
 #

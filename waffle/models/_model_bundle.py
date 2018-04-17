@@ -37,8 +37,14 @@ class JointModelBundle(object):
             model = HiPassFilterModel(self.detector, **model_conf)
         elif model_name == "LowPassFilterModel":
             model = LowPassFilterModel(self.detector, **model_conf)
+        elif model_name == "DigitalFilterModel":
+            model = DigitalFilterModel(self.detector, **model_conf)
         elif model_name ==  "OvershootFilterModel":
             model = OvershootFilterModel(self.detector, **model_conf)
+        elif model_name ==  "OscillationFilterModel":
+            model = OscillationFilterModel(self.detector, **model_conf)
+        elif model_name == "AntialiasingFilterModel":
+            model = AntialiasingFilterModel(self.detector, **model_conf)
         elif model_name ==  "TrappingModel":
             model = TrappingModel(**model_conf)
         elif issubclass(model_name, JointModelBase):

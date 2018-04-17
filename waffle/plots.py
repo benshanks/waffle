@@ -128,7 +128,7 @@ class TrainingPlotter(PlotterBase):
                 #     print ("under: {}".format(lo_pz))
 
 
-        ax0.set_ylim(-20, np.amax([ np.amax(wf.data) for wf in model.wfs])*1.1)
+        # ax0.set_ylim(-20, np.amax([ np.amax(wf.data) for wf in model.wfs])*1.1)
         ax1.axhline(y=0,color="black", ls=":")
         # ax0.axvline(x=model.conf.align_idx*10,color="black", ls=":")
         # ax1.axvline(x=model.conf.align_idx*10,color="black", ls=":")
@@ -225,12 +225,20 @@ class TrainingPlotter(PlotterBase):
                     decay_const = -1/np.log(-1*model.digital_filter.den[-1])/1E9/1E-6
                     ax_decay_rc.axvline(decay_const, alpha=0.2, color=colors[mod_idx])
 
-                elif isinstance(model, LowPassFilterModel):
+                elif isinstance(model, LowPassFilterModel) or isinstance(model, AntialiasingFilterModel):
                     w_lo = np.logspace(-6, 0, 500, base=np.pi)
                     (w_lo, h3) = model.get_freqz(data, w_lo)
-                    p3 = ax2.loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[mod_idx])
 
-            ax_square.plot(square, color="b", alpha=0.2)
+                    h3_db = 10*np.log10(np.abs(h3))
+
+                    p3 = ax2.semilogx( w_lo, h3_db, alpha = 0.2, color=colors[mod_idx])
+                else:
+                    w_lo = np.logspace(-15, 0, 500, base=np.pi)
+                    (w_lo, h3) = model.get_freqz(data, w_lo)
+                    ax_square.loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[mod_idx])
+
+
+            # ax_square.plot(square, color="b", alpha=0.2)
 
 
         an = np.linspace(0,np.pi,200)
@@ -297,7 +305,10 @@ class TrainingPlotter(PlotterBase):
         for i in range(self.num_wf_params):
             for j in range (self.model.num_waveforms):
                 tf_data = self.plot_data[self.model.num_det_params + self.num_wf_params*j+i]
-                ax[i].plot(tf_data, color=colors[j], ls="steps")
+                try:
+                    ax[i].plot(tf_data, color=colors[j], ls="steps")
+                except TypeError:
+                    ax.plot(tf_data, color=colors[j], ls="steps")
 
 class WaveformFitPlotter(PlotterBase):
 

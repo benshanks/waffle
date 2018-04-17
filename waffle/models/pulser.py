@@ -19,6 +19,14 @@ class PulserEnergyModel(JointModelBase):
     def apply_to_detector(self, params, detector):
         detector.energy = params
 
+class PulserRiseTimeModel(JointModelBase):
+    def __init__(self, rt_guess):
+        self.params = [
+            Parameter("risetime", "gaussian", rt_guess, rt_guess, lim_lo=0, lim_hi=10*rt_guess),
+        ]
+    def apply_to_detector(self, params, detector):
+        detector.rise_time = params
+
 class PulserGenerator(object):
 
     def __init__(self, wf_length):
@@ -26,6 +34,7 @@ class PulserGenerator(object):
         self.output_wf = np.zeros(wf_length)
         self.interpType = "linear"
         self.energy = 1
+        self.rise_time=0
 
     def AddDigitalFilter(self, filter):
         self.digital_filters.append(filter)
@@ -37,7 +46,14 @@ class PulserGenerator(object):
 
         #make a 1E9 sampled waveform
         temp_wf_sig = np.zeros(20*outputLength)
-        temp_wf_sig[100:] = energy
+
+        if self.rise_time == 0:
+            temp_wf_sig[100:] = energy
+        else:
+            rise_time = self.rise_time
+            rise_time = int(np.around(rise_time))
+            temp_wf_sig[100:100+rise_time] = np.linspace(0, energy, rise_time)
+            temp_wf_sig[100+rise_time:] = energy
 
         for filter in self.digital_filters:
             temp_wf_sig = filter.apply_to_signal(temp_wf_sig)
@@ -123,6 +139,7 @@ class PulserModel(ModelBaseClass):
                 Parameter("energy", "gaussian", mean=wf_max, variance=0.1*wf_max, lim_lo=0.5*wf_max, lim_hi=1.5*wf_max),
             )
 
+
     def perturb(self, params):
         logH = 0
 
@@ -191,6 +208,9 @@ class PulserTrainingModel(object):
         #Set up all the models...
         if self.conf.joint_energy:
             model_conf.append((PulserEnergyModel, {"energy_guess":self.wfs[0].windowed_wf.max()} ) )
+
+        if self.conf.joint_risetime:
+            model_conf.append((PulserRiseTimeModel, {"rt_guess":5} ) )
 
         self.joint_models = JointModelBundle(model_conf, self.pg)
         self.num_det_params = self.joint_models.num_params
