@@ -179,7 +179,7 @@ class DataProcessor():
         return cal_map
 
     def tier0(self, runList, chanList=None):
-        process_tier_0(self.raw_data_dir, runList, output_dir=self.t1_data_dir, chanList=chanList)
+        process_tier_0(self.raw_data_dir, runList, output_dir=self.t1_data_dir, chan_list=chanList)
 
     def tier1(self, runList, num_threads):
         procs = self.get_processor_list()
@@ -193,20 +193,27 @@ class DataProcessor():
         chan_dfs = []
         for runNumber in runList:
             t1_file = os.path.join(self.t1_data_dir, "t1_run{}.h5".format(runNumber))
-            channel_info = pd.read_hdf(t1_file,key="channel_info")
+            channel_info = pd.read_hdf(t1_file,key="ORGretina4MWaveformDecoder")
             chan_dfs.append(channel_info)
 
         chan_df = pd.concat(chan_dfs, axis=0)
         chanList = np.unique(chan_df["channel"])
 
+        # print(chan_df)
+        # print(channel_info)
+
         NLCMap = []
         for ccc in chanList:
             try:
-                boardSN = channel_info.loc[ccc].board_id
+                # boardSN = chan_df.loc[ccc].board_id
+                # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id
+                boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id[1]
                 # NLCMap[chan] = load_nonlinearities(serial, chan, runList)
-                # print(boardSN)
+                print("For {}, board SN is {}".format(ccc,boardSN))
+
             except KeyError:
-                print("Channel {} not there?".format(chan))
+                print("Channel {} not there?".format(ccc))
+                continue
 
             crate = ccc >> 9
             card = (ccc & 0xff) >>4
@@ -252,6 +259,7 @@ class DataProcessor():
 
 
         df_nl = pd.DataFrame(NLCMap)
+        print(df_nl)
         df_nl.set_index("channel", drop=False, inplace=True)
 
 
@@ -274,16 +282,16 @@ class DataProcessor():
         procs.AddCalculator(is_saturated, {}, output_name="is_saturated")
 
         #nonlinearity_correct
-        db_path = self.nl_file_name
-        procs.AddDatabaseLookup(get_nonlinearity, {"channel": "channel", "db_path":db_path}, output_name=["nlc1", "nlc2"])
-        procs.AddTransform(nonlinearity_correct, {"time_constant_samples":190,
-                                                  "fNLCMap": "nlc1",
-                                                  "fNLCMap2":"nlc2"
-                                                }, input_waveform="waveform", output_waveform="nlc_wf")
+        # db_path = self.nl_file_name
+        # procs.AddDatabaseLookup(get_nonlinearity, {"channel": "channel", "db_path":db_path}, output_name=["nlc1", "nlc2"])
+        # procs.AddTransform(nonlinearity_correct, {"time_constant_samples":190,
+        #                                           "fNLCMap": "nlc1",
+        #                                           "fNLCMap2":"nlc2"
+        #                                         }, input_waveform="waveform", output_waveform="nlc_wf")
 
         #baseline remove
-        procs.AddCalculator(fit_baseline, {"end_index":700}, input_waveform="nlc_wf", output_name=["bl_slope", "bl_int"])
-        procs.AddTransform(remove_baseline, {"bl_0":"bl_int", "bl_1":"bl_slope"}, input_waveform="nlc_wf", output_waveform="blrmnlc_wf")
+        procs.AddCalculator(fit_baseline, {"end_index":700}, input_waveform="waveform", output_name=["bl_slope", "bl_int"])
+        procs.AddTransform(remove_baseline, {"bl_0":"bl_int", "bl_1":"bl_slope"}, input_waveform="waveform", output_waveform="blrmnlc_wf")
 
         #calculate max currents from baseline-removed wf with a few different sigma vals
         for sig in [1,3,5,7]:
@@ -302,7 +310,7 @@ class DataProcessor():
         # procs.AddCalculator(t0_estimate, {}, input_waveform="sg_wf", output_name="t0est")
 
         #energy estimator: pz correct, calc trap
-        procs.AddTransform(pz_correct, {"rc_1":72, "rc_2":2, "rc1_frac":0.99}, input_waveform="blrmnlc_wf", output_waveform="pz_wf")
+        procs.AddTransform(pz_correct, {"rc":72, "digFreq":100E6}, input_waveform="blrmnlc_wf", output_waveform="pz_wf")
         procs.AddTransform(trap_filter, {"rampTime":400, "flatTime":200}, input_waveform="pz_wf", output_waveform="trap_wf")
 
         procs.AddCalculator(trap_max, {}, input_waveform="trap_wf", output_name="trap_max")
@@ -319,7 +327,7 @@ class DataProcessor():
             t1_file = os.path.join(self.t1_data_dir,"t1_run{}.h5".format(runNumber))
             t2_file = os.path.join(self.t2_data_dir, "t2_run{}.h5".format(runNumber))
             df = pd.read_hdf(t2_file,key="data")
-            tier1 = pd.read_hdf(t1_file,key="data")
+            tier1 = pd.read_hdf(t1_file,key="ORGretina4MWaveformDecoder")
             df = df.drop({"channel", "energy", "timestamp"}, axis=1)
             df = df.join(tier1)
             df_all_runs.append(df)
@@ -382,7 +390,7 @@ class DataProcessor():
             bin_centers = get_bin_centers(bins)
             idxs_over_50 = hist > 0.1*np.amax(hist)
             first_dt =  bin_centers[np.argmax(idxs_over_50)]
-            last_dt = bin_centers[  len(idxs_over_50) - np.argmax(idxs_over_50[::-1])  ]
+            last_dt = bin_centers[  len(idxs_over_50) - np.argmax(idxs_over_50[::-1]) - 1 ]
 
             train_set = (df_ae.ae>0)&(df_ae.ae<2)&(dt >= first_dt)&(dt < last_dt)
 
@@ -417,9 +425,9 @@ class DataProcessor():
                     df_bin = df_cut[(dt_ae >= b_lo) & (dt_ae<b_hi)]
                     for i, (index, row) in enumerate(df_bin.iterrows()):
                         if i>=50: break
-                        wf = Waveform( row, )
-                        wf.data -= row["bl_int"] + np.arange(len(wf.data))*row["bl_slope"]
-                        wf.data /= row["energy_cal"]
+                        wf = Waveform( row["waveform"], sample_period=1E-8)
+                        wf.data = wf.data - row["bl_int"] + np.arange(len(wf.data))*row["bl_slope"]
+                        wf.data = wf.data/row["energy_cal"]
 
                         t0_est = np.argmax(wf.data > 0.95)
 
@@ -461,7 +469,7 @@ class DataProcessor():
             df_bin = df_train[(df_train.drift_time >= b_lo) & (df_train.drift_time<b_hi)]
             for i, (index, row) in enumerate(df_bin.iterrows()):
                 if index in exclude_list: continue
-                wf = Waveform( row, amplitude=row["trap_max"], bl_slope=row["bl_slope"], bl_int=row["bl_int"], t0_estimate=row["t0_est"])
+                wf = Waveform( row["waveform"], sample_period=1e-8) #, amplitude=row["trap_max"], bl_slope=row["bl_slope"], bl_int=row["bl_int"], t0_estimate=row["t0_est"])
                 wf.training_set_index = index
                 baseline_val_arr = np.append(  baseline_val_arr, (wf.data - (row["bl_slope"]*np.arange(len(wf.data))  + row["bl_int"]))[:700]   )
 
@@ -494,6 +502,8 @@ def calculate_timepoints(df, time_points, relative_tp=0.5):
     max_val = np.zeros(len(df))
 
     for i, (index, row) in enumerate(df.iterrows()):
+        # print("Value of the row")
+        # print(row)
         wf_cent = get_waveform(row, doInterp=False)
         max_idx[i] = np.argmax(wf_cent)
         min_val[i] = np.amin(wf_cent)
@@ -528,10 +538,13 @@ def calculate_timepoints(df, time_points, relative_tp=0.5):
 def get_waveform(row, align_tp=0.5, doInterp=True):
     import pygama.transforms as pgt
 
-    wf = Waveform( row, )
+    wf = Waveform( row["waveform"], sample_period=1e-8)
 
-    wf.data -= row["bl_int"] + np.arange(len(wf.data))*row["bl_slope"]
-    wf.data /= row["trap_max"]
+    # wf.data = wf.data.astype(float)
+
+    wf.data = wf.data - row["bl_int"]
+    wf.data = wf.data + np.arange(len(wf.data))*row["bl_slope"]
+    wf.data = wf.data/row["trap_max"]
 
     tp = calc_timepoint(wf.data, align_tp, do_interp=True, doNorm=False)
 

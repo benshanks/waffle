@@ -16,7 +16,7 @@ class WaveformModel(ModelBaseClass):
     """
     Specify the model in Python.
     """
-    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smooth=True, smoothing_type="gauss"):
+    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smoothing=True, smoothing_type="gaussian"):
 
         self.detector = detector
 
@@ -26,17 +26,19 @@ class WaveformModel(ModelBaseClass):
         self.align_sigma = 1
         self.align_idx = align_idx
 
+        amplitude = target_wf.data.max()
+
         self.params = [
             Parameter("r", "uniform", lim_lo=0, lim_hi=detector.detector_radius),
             Parameter("z", "uniform", lim_lo=0, lim_hi=detector.detector_length),
             Parameter("phi", "uniform", lim_lo=0, lim_hi=np.pi/4),
-            Parameter("scale", "gaussian", mean=target_wf.amplitude, variance=20, lim_lo=0.5*target_wf.amplitude, lim_hi=1.5*target_wf.amplitude),
+            Parameter("scale", "gaussian", mean=amplitude, variance=20, lim_lo=0.5*amplitude, lim_hi=1.5*amplitude),
             Parameter("t_align", "gaussian", mean=self.align_idx, variance=self.align_sigma, lim_lo=self.align_idx-5, lim_hi=self.align_idx+5),
         ]
 
-        self.do_smooth=do_smooth
+        self.do_smoothing=do_smoothing
         self.smoothing_type = smoothing_type
-        if do_smooth:
+        if do_smoothing:
             if smoothing_type == "gaussian":
                 smooth_guess = 20
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
@@ -61,7 +63,7 @@ class WaveformModel(ModelBaseClass):
 
         reps = 1
         if rng.rand() < 0.5:
-            reps += np.int(np.power(100.0, rng.rand()));
+            reps += np.int(np.power(100.0, rng.rand()))
 
         for i in range(reps):
             which = rng.randint(self.num_params)
@@ -88,11 +90,13 @@ class WaveformModel(ModelBaseClass):
         return prior
 
     def make_waveform(self, data_len, wf_params, charge_type=None):
+        # print("Waveform parameters")
+        # print(wf_params)
         r, z, phi, scale, maxt =  wf_params[:5]
 
         smooth = None
         skew=None
-        if self.do_smooth:
+        if self.do_smoothing:
             smooth = wf_params[5]
             if smooth < 0:
                 raise ValueError("Smooth should not be below 0 (value {})".format(smooth))

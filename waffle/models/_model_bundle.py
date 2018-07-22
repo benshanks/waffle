@@ -16,9 +16,10 @@ class JointModelBundle(object):
 
         self.num_params = 0
         i=0
+        # print(self.conf)
 
-        for model_idx, (model_name, model_conf) in enumerate(self.conf):
-            model = self.append(model_name, model_conf)
+        for model_idx, model_name in enumerate(self.conf):
+            model = self.append(model_name, conf[model_name])
             self.num_params += model.num_params
             self.start_map[model_idx] = i
             model.start_idx = i
@@ -26,6 +27,16 @@ class JointModelBundle(object):
             for j in range(model.num_params):
                 self.index_map[i] = model_idx
                 i +=1
+            
+        # for (model_idx, model_name) in enumerate(self.conf.keys()):
+        #     model = self.append(model_name, model_conf)
+        #     self.num_params += model.num_params
+        #     self.start_map[model_idx] = i
+        #     model.start_idx = i
+
+        #     for j in range(model.num_params):
+        #         self.index_map[i] = model_idx
+        #         i +=1
 
     def append(self, model_name, model_conf):
         #TODO: surely this can be done with introspection
