@@ -192,29 +192,35 @@ class TrainingPlotter(PlotterBase):
         ax_decay_rc = plt.subplot(gs[1,1])
         ax_square = plt.subplot(gs[1,2])
 
+        square_fig = plt.figure()
+        square_ax = plt.gca()
+
         for idx, row in self.plot_data.iterrows():
             mod_idx = -1
 
             #show the square response for the whole thing
             square = np.zeros(1000)
             square[100:] = 1
+            sp = np.copy(square)
 
             for model in self.model.joint_models.models:
-                if not isinstance(model, DigitalFilterModel): continue
+                if not (isinstance(model, DigitalFilterModel) or isinstance(model, FirstStageFilterModel)or isinstance(model, AntialiasingFilterModel)): continue
                 mod_idx +=1
 
                 data = row[model.start_idx: model.start_idx + model.num_params].values
 
                 model.apply_to_detector(data, None)
-                square = model.digital_filter.apply_to_signal(square)
+                # square = model.digital_filter.apply_to_signal(square)
 
-                pz = model.get_pz(data)
+                try:
+                    pz = model.get_pz(data)
 
-                for i, pole in enumerate(pz["poles"]):
-                    ax0.scatter(np.real(pole), np.imag(pole), color=colors[mod_idx], alpha=0.3)
+                    for i, pole in enumerate(pz["poles"]):
+                        ax0.scatter(np.real(pole), np.imag(pole), color=colors[mod_idx], alpha=0.3)
 
-                for i, zero in enumerate(pz["zeros"]):
-                    ax0.scatter(np.real(zero), np.imag(zero), color=colors[mod_idx], alpha=0.3)
+                    for i, zero in enumerate(pz["zeros"]):
+                        ax0.scatter(np.real(zero), np.imag(zero), color=colors[mod_idx], alpha=0.3)
+                except AttributeError: pass
 
                 if isinstance(model, HiPassFilterModel):
                     w_hi = np.logspace(-15, -6, 500, base=np.pi)
@@ -225,20 +231,30 @@ class TrainingPlotter(PlotterBase):
                     decay_const = -1/np.log(-1*model.digital_filter.den[-1])/1E9/1E-6
                     ax_decay_rc.axvline(decay_const, alpha=0.2, color=colors[mod_idx])
 
-                elif isinstance(model, LowPassFilterModel) or isinstance(model, AntialiasingFilterModel):
-                    w_lo = np.logspace(-6, 0, 500, base=np.pi)
+                elif isinstance(model, LowPassFilterModel) or isinstance(model, AntialiasingFilterModel) or isinstance(model, FirstStageFilterModel):
+
+                    w_lo = np.logspace(-6, 1, 500, base=np.pi)
                     (w_lo, h3) = model.get_freqz(data, w_lo)
 
                     h3_db = 10*np.log10(np.abs(h3))
 
                     p3 = ax2.semilogx( w_lo, h3_db, alpha = 0.2, color=colors[mod_idx])
+
+                    spi = model.apply_to_signal(square)
+                    sp = model.apply_to_signal(sp)
+                    square_ax.plot(spi, color=colors[mod_idx], alpha=0.1   )
+
                 else:
-                    w_lo = np.logspace(-15, 0, 500, base=np.pi)
+                    w_lo = np.logspace(-15, 1, 500, base=np.pi)
                     (w_lo, h3) = model.get_freqz(data, w_lo)
                     ax_square.loglog( w_lo, np.abs(h3), alpha = 0.2, color=colors[mod_idx])
 
+                    spi = model.apply_to_signal(square)
+                    sp = model.apply_to_signal(sp)
+                    square_ax.plot(spi, color=colors[mod_idx], alpha=0.1   )
 
-            # ax_square.plot(square, color="b", alpha=0.2)
+
+            square_ax.plot(sp, color="k", alpha=0.2)
 
 
         an = np.linspace(0,np.pi,200)

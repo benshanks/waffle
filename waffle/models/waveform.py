@@ -37,7 +37,7 @@ class WaveformModel(ModelBaseClass):
         self.do_smooth=do_smooth
         self.smoothing_type = smoothing_type
         if do_smooth:
-            if smoothing_type == "gaussian":
+            if smoothing_type == "gauss":
                 smooth_guess = 20
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
             elif smoothing_type == "skew":
@@ -46,6 +46,8 @@ class WaveformModel(ModelBaseClass):
                 skew_guess = 0
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
                 self.params.append(Parameter("skew", "gaussian", mean=skew_guess, variance=5, lim_lo=-np.inf, lim_hi=np.inf))
+            else:
+                raise ValueError("{} is not gauss or skew".format(smoothing_type))
 
     def draw_position(self, wf_idx):
       r = rng.rand() * self.detector.detector_radius

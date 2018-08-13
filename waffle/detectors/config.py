@@ -14,7 +14,7 @@ def create_conf_file(detector_name, output_name, uncert=0.5):
         imp_min, imp_max = -2, -5
 
     elif detector_name[0].lower() == "p": #ORTEC
-        det_info = get_detector_info(detector_name)
+        det_info = get_ortec_detector_info(detector_name)
         siggen_dict = detector_info_to_conf_file(det_info)
 
         #divide by 10 to go from 1E9 to 1E10
