@@ -44,6 +44,9 @@ class PlotterBase():
             self.plot_data = data.iloc[(end_idx - num_samples):end_idx:sample_dec]
         elif num_samples < plotNum:
             self.plot_data = data
+        elif num_samples == plotNum:
+            self.plot_data = data
+
         print( " plotting {} samples".format( len(self.plot_data) ))
 
 
@@ -250,6 +253,35 @@ class TrainingPlotter(PlotterBase):
 
 
     def plot_imp(self):
+        im = self.model.imp_model
+        imp_data = self.plot_data.iloc[:, self.model.imp_first_idx: self.model.imp_first_idx + im.get_num_params()]
+
+        imp_z0 = imp_data.iloc[:,0].as_matrix()
+        imp_zmax = imp_data.iloc[:,1].as_matrix()
+
+        g = sns.jointplot(x=imp_z0, y=imp_zmax, kind="kde", stat_func=None)
+
+        avgs = self.model.detector.imp_avg_points
+        grads = self.model.detector.imp_grad_points
+
+        # plt.figure()
+
+        for avg in avgs:
+            y1 = 2*avg - im.imp_max
+            y2 = 2*avg - 0
+            g.ax_joint.plot((im.imp_max, 0), (y1, y2), c="k", ls="--")
+        for grad in grads:
+            y1 = (grad*self.model.detector.detector_length/10) + im.imp_max
+            y2 = (grad*self.model.detector.detector_length/10) + 0
+
+            g.ax_joint.plot((im.imp_max, 0), (y1, y2), c="k", ls="--")
+
+        g.ax_joint.set_xlim(im.imp_max, 0)
+        g.ax_joint.set_ylim(im.imp_min, 0)
+
+        #overlay the grid of calculated points
+
+    def plot_imp_ends(self):
         im = self.model.imp_model
         imp_data = self.plot_data.iloc[:, self.model.imp_first_idx: self.model.imp_first_idx + im.get_num_params()]
 
