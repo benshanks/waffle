@@ -16,38 +16,28 @@ class WaveformModel(ModelBaseClass):
     """
     Specify the model in Python.
     """
-    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smoothing=True, smoothing_type="gaussian"):
+    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smoothing=True, smoothing_type="gauss"):
 
         self.detector = detector
 
         self.target_wf = target_wf
         self.align_percent = align_percent
 
-        try:
-            target_wf.amplitude is not None
-            pass
-        except AttributeError as e:
-            # The wf object doesn't have an amplitude key in it, so I'll just add one now...
-            self.target_wf.amplitude = np.amax(self.target_wf.data)
-
         self.align_sigma = 1
         self.align_idx = align_idx
 
-        # self.amplitude = target_wf.data.max()
-        
         self.params = [
             Parameter("r", "uniform", lim_lo=0, lim_hi=detector.detector_radius),
             Parameter("z", "uniform", lim_lo=0, lim_hi=detector.detector_length),
             Parameter("phi", "uniform", lim_lo=0, lim_hi=np.pi/4),
             Parameter("scale", "gaussian", mean=target_wf.amplitude, variance=20, lim_lo=0.5*target_wf.amplitude, lim_hi=1.5*target_wf.amplitude),
-            # Parameter("scale", "gaussian", mean=amplitude, variance=20, lim_lo=0.5*amplitude, lim_hi=1.5*amplitude),
             Parameter("t_align", "gaussian", mean=self.align_idx, variance=self.align_sigma, lim_lo=self.align_idx-5, lim_hi=self.align_idx+5),
         ]
 
-        self.do_smoothing=do_smoothing
+        self.do_smoothing=do_smooth
         self.smoothing_type = smoothing_type
-        if do_smoothing:
-            if smoothing_type == "gaussian":
+        if do_smooth:
+            if smoothing_type == "gauss":
                 smooth_guess = 20
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
             elif smoothing_type == "skew":
@@ -56,6 +46,8 @@ class WaveformModel(ModelBaseClass):
                 skew_guess = 0
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
                 self.params.append(Parameter("skew", "gaussian", mean=skew_guess, variance=5, lim_lo=-np.inf, lim_hi=np.inf))
+            else:
+                raise ValueError("{} is not gauss or skew".format(smoothing_type))
 
     def draw_position(self, wf_idx):
       r = rng.rand() * self.detector.detector_radius
@@ -98,13 +90,11 @@ class WaveformModel(ModelBaseClass):
         return prior
 
     def make_waveform(self, data_len, wf_params, charge_type=None):
-        # print("Waveform parameters")
-        # print(wf_params)
         r, z, phi, scale, maxt =  wf_params[:5]
 
         smooth = None
         skew=None
-        if self.do_smoothing:
+        if self.do_smooth:
             smooth = wf_params[5]
             if smooth < 0:
                 raise ValueError("Smooth should not be below 0 (value {})".format(smooth))

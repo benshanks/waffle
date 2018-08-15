@@ -32,7 +32,7 @@ class PulserGenerator(object):
     def __init__(self, wf_length):
         self.digital_filters = []
         self.output_wf = np.zeros(wf_length)
-        self.interpType = "linear"
+        self.interpType = "cubic"
         self.energy = 1
         self.rise_time=0
 
@@ -200,6 +200,7 @@ class PulserTrainingModel(object):
 
         #Setup detector and waveforms
         self.pg = PulserGenerator(self.conf.wf_conf["num_samples"])
+        self.pg.interpType = fit_configuration.interpType
         self.wf_models = []
         self.setup_waveforms(self.conf.wf_config, doPrint=False)
 

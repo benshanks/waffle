@@ -48,7 +48,7 @@ class DigitalFilterModel(JointModelBase):
                     Parameter("zero_mag", "uniform", lim_lo=zmag_lims[0], lim_hi=zmag_lims[-1]),
                 )
                 self.params.append(
-                    Parameter("zero_mag", "uniform", lim_lo=zphi_lims[0], lim_hi=zphi_lims[-1]),
+                    Parameter("zero_phi", "uniform", lim_lo=zphi_lims[0], lim_hi=zphi_lims[-1]),
                 )
 
     def get_pz(self, params):
@@ -71,6 +71,9 @@ class DigitalFilterModel(JointModelBase):
 
 
         return return_dict
+
+    def apply_to_signal(self, signal):
+        return self.digital_filter.apply_to_signal(signal)
 
     def apply_to_detector(self, params, detector):
         if self.order == 1:
@@ -95,11 +98,11 @@ class DigitalFilterModel(JointModelBase):
         # w=np.logspace(-15, -5, 500, base=np.pi)
 
         num, den = self.digital_filter.num, self.digital_filter.den
-        if np.sum(num) != 0: num /= np.sum(num)/np.sum(den)
-        w, h = signal.freqz(num, den, worN=w )
+        if np.sum(num) != 0: num_calc = num/(np.sum(num)/np.sum(den))
+        else: num_calc=num
+        w, h = signal.freqz(num_calc, den, worN=w )
         w/= (np.pi /self.nyq_freq)
         return w, h
-
 
 class LowPassFilterModel(DigitalFilterModel):
     def __init__(self,detector, order=2, include_zeros=False, pmag_lims=None, pphi_lims=None, zmag_lims=None, zphi_lims=None):
@@ -150,7 +153,7 @@ class OvershootFilterModel(DigitalFilterModel):
         include_zeros = True
 
         if zmag_lims is None: zmag_lims = [0.1,10] #us decay constant (should be around 2?)
-        if pmag_lims is None: pmag_lims = [-8,-5]
+        if pmag_lims is None: pmag_lims = [-8,-3]
 
         super().__init__(detector, order, include_zeros, pmag_lims, None, zmag_lims, None, do_transform=True)
 
@@ -163,8 +166,9 @@ class OvershootFilterModel(DigitalFilterModel):
 class OscillationFilterModel(DigitalFilterModel):
     '''
     Second order filter, Two parameters:
-    --Pole magnitude is
+    --Pole magnitude is (inverse) strength (amplitude) of oscillation
     --complex angle is oscillation frequency in MHz
+    --zero is relative to the pole
     Transfer function is:
                 1
         -----------------
@@ -174,38 +178,116 @@ class OscillationFilterModel(DigitalFilterModel):
     def __init__(self, detector, include_zeros = True, pmag_lims=None, pphi_lims=None, zmag_lims=None, zphi_lims=None):
         order = 2
 
-        if pmag_lims is None: pmag_lims = [-4,-1]
+        if pmag_lims is None: pmag_lims = [-4,0]
         if pphi_lims is None: pphi_lims = [3, 7]
-        if zmag_lims is None: zmag_lims = [-4,-1]
+        if zmag_lims is None: zmag_lims = [-4,0]
         if zphi_lims is None: zphi_lims = [3, 7]
 
         super().__init__(detector, order, include_zeros, pmag_lims, pphi_lims, zmag_lims, zphi_lims, do_transform=True)
-
-        self.digital_filter.num = [1]
 
     def transform_params(self, pmag, pphi, zmag, zphi):
         pmag = 1. - 10.**pmag
         pphi = pphi*1E6 * (np.pi /self.nyq_freq)
 
         zmag = 1. - 10.**zmag
-        zphi = zphi*1E6 * (np.pi /self.nyq_freq)
+
+        zphi = pphi
 
         return (pmag, pphi, zmag, zphi)
 
-class AntialiasingFilterModel(DigitalFilterModel):
+class AntialiasingFilterModel(JointModelBase):
     '''
-    First order low pass filter, choose the effective roll-off frequency in MHz
+    Fourth order lowpass designed to look like simulated model of Gretina input
     '''
 
-    def __init__(self,detector, pmag_lims=None):
-        if pmag_lims is None: pmag_lims = [0,100]
+    def __init__(self,detector):
+        self.freq_samp = 1E9
+        self.nyq_freq = 0.5*self.freq_samp
 
-        super().__init__(detector, 1, False, pmag_lims, None, None, None, do_transform=True)
-        self.digital_filter.num = [1]
+        self.params = [
+            Parameter("aa_mag", "uniform", lim_lo=0.5, lim_hi=1),
+            Parameter("aa_phi", "uniform", lim_lo=0.0, lim_hi=0.25),
+        ]
 
-    def transform_params(self, pmag, pphi, zmag, zphi):
-        tau = 1/(2*np.pi*pmag*1E6)
+        self.digital_filter1 = DigitalFilter(2)
+        self.digital_filter2 = DigitalFilter(2)
+        detector.AddDigitalFilter(self.digital_filter1)
+        detector.AddDigitalFilter(self.digital_filter2)
 
-        pmag = np.exp(-1./self.freq_samp/(tau))
+        self.digital_filter1.num = [1,1]
+        self.digital_filter2.num = [1]
 
-        return pmag, 0, 0, 0
+    def apply_to_detector(self, params, detector):
+        mag, phi = params[:]
+        self.digital_filter1.set_poles(mag, phi)
+        self.digital_filter2.set_poles(mag, phi)
+
+    def get_freqz(self, params, w):
+        self.apply_to_detector(params, None)
+        # w=np.logspace(-15, -5, 500, base=np.pi)
+
+        num1, den1 = self.digital_filter1.num, self.digital_filter1.den
+        num1_c = num1/ (np.sum(num1)/np.sum(den1))
+        w, h1 = signal.freqz(num1_c, den1, worN=w )
+
+        num2, den2 = self.digital_filter2.num, self.digital_filter2.den
+        num2_c = num2/ (np.sum(num2)/np.sum(den2))
+        w, h2 = signal.freqz(num2_c, den1, worN=w )
+
+        w/= (np.pi /self.nyq_freq)
+
+        return w, h1*h2
+
+    def apply_to_signal(self, signal):
+        sig = self.digital_filter1.apply_to_signal(signal)
+        return self.digital_filter2.apply_to_signal(sig)
+
+class FirstStageFilterModel(JointModelBase):
+    '''
+    Fourth order lowpass designed to look MJD first stage
+    '''
+
+    def __init__(self,detector):
+        self.freq_samp = 1E9
+        self.nyq_freq = 0.5*self.freq_samp
+        self.params = [
+            Parameter("fs_fo_pole", "uniform", lim_lo=-2.5, lim_hi=-0.5),
+            Parameter("fs_fo_zero", "uniform", lim_lo=0.7, lim_hi=1),
+            # Parameter("fs_so_mag", "uniform", lim_lo=pmag_lims[0], lim_hi=pmag_lims[-1]),
+            Parameter("fs_so_phi", "uniform", lim_lo=-8, lim_hi=0),
+        ]
+
+        self.digital_filter1 = DigitalFilter(1)
+        self.digital_filter2 = DigitalFilter(2)
+        detector.AddDigitalFilter(self.digital_filter1)
+        detector.AddDigitalFilter(self.digital_filter2)
+
+        self.digital_filter2.num = [1]
+
+
+    def apply_to_detector(self, params, detector):
+        fo_pole, fo_zero, so_phi  = params[:]
+
+        fo_pole = 1- 10**fo_pole
+        so_phi = 10**so_phi
+
+        self.digital_filter1.set_poles(fo_pole)
+        self.digital_filter1.set_zeros(fo_zero)
+
+        self.digital_filter2.set_poles(fo_zero, so_phi)
+
+    def get_freqz(self, params, w):
+        self.apply_to_detector(params, None)
+        # w=np.logspace(-15, -5, 500, base=np.pi)
+
+        num1, den1 = self.digital_filter1.num, self.digital_filter1.den
+        num1_c = num1/ (np.sum(num1)/np.sum(den1))
+        w, h1 = signal.freqz(num1_c, den1, worN=w )
+
+        num2, den2 = self.digital_filter2.num, self.digital_filter2.den
+        num2_c = num2/ (np.sum(num2)/np.sum(den2))
+        w, h2 = signal.freqz(num2_c, den1, worN=w )
+
+        w/= (np.pi /self.nyq_freq)
+
+        return w, h1*h2

@@ -46,6 +46,8 @@ class JointModelBundle(object):
             model = OscillationFilterModel(self.detector, **model_conf)
         elif model_name == "AntialiasingFilterModel":
             model = AntialiasingFilterModel(self.detector, **model_conf)
+        elif model_name == "FirstStageFilterModel":
+            model = FirstStageFilterModel(self.detector, **model_conf)
         elif model_name ==  "TrappingModel":
             model = TrappingModel(**model_conf)
         elif issubclass(model_name, JointModelBase):
