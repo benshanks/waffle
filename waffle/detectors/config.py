@@ -14,7 +14,7 @@ def create_conf_file(detector_name, output_name, uncert=0.5):
         imp_min, imp_max = -2, -5
 
     elif detector_name[0].lower() == "p": #ORTEC
-        det_info = get_detector_info(detector_name)
+        det_info = get_ortec_detector_info(detector_name)
         siggen_dict = detector_info_to_conf_file(det_info)
 
         #divide by 10 to go from 1E9 to 1E10
@@ -74,9 +74,24 @@ def get_ortec_detector_info(detector_name):
     #fill in missing deadlayer info
     df_ortec['dead_layer'].fillna((df_ortec['dead_layer'].mean()), inplace=True)
 
-    detector_info = df_ortec.loc[detector_name]
-    det_starret = df_starret.loc[detector_name]
-    det_contact = df_contact.loc[detector_name]
+    try:
+        detector_info = df_ortec.loc[detector_name]
+    except KeyError as e:
+        print(e)
+        print("The detector {} you are generating was not located in the ortec measurement spreadsheet ({})".format(detector_name,ortec_file_name))
+        exit()
+    try:
+        det_starret = df_starret.loc[detector_name]
+    except KeyError as e:
+        print(e)
+        print("The detector {} you are generating was not located in the starrett measurement spreadsheet ({})".format(detector_name,starret_file_name))
+        exit()
+    try:
+        det_contact = df_contact.loc[detector_name]
+    except KeyError as e:
+        print(e)
+        print("The detector {} you are generating was not located in the contact measurement spreadsheet ({})".format(detector_name, contact_file_name))
+        exit()
 
     for param_name in starret_col_names[1:]:
         if np.isnan(det_starret[param_name]):
