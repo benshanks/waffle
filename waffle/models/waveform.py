@@ -23,16 +23,24 @@ class WaveformModel(ModelBaseClass):
         self.target_wf = target_wf
         self.align_percent = align_percent
 
+        try:
+            target_wf.amplitude is not None
+            pass
+        except AttributeError as e:
+            # The wf object doesn't have an amplitude key in it, so I'll just add one now...
+            self.target_wf.amplitude = np.amax(self.target_wf.data)
+
         self.align_sigma = 1
         self.align_idx = align_idx
 
-        amplitude = target_wf.data.max()
-
+        # self.amplitude = target_wf.data.max()
+        
         self.params = [
             Parameter("r", "uniform", lim_lo=0, lim_hi=detector.detector_radius),
             Parameter("z", "uniform", lim_lo=0, lim_hi=detector.detector_length),
             Parameter("phi", "uniform", lim_lo=0, lim_hi=np.pi/4),
-            Parameter("scale", "gaussian", mean=amplitude, variance=20, lim_lo=0.5*amplitude, lim_hi=1.5*amplitude),
+            Parameter("scale", "gaussian", mean=target_wf.amplitude, variance=20, lim_lo=0.5*target_wf.amplitude, lim_hi=1.5*target_wf.amplitude),
+            # Parameter("scale", "gaussian", mean=amplitude, variance=20, lim_lo=0.5*amplitude, lim_hi=1.5*amplitude),
             Parameter("t_align", "gaussian", mean=self.align_idx, variance=self.align_sigma, lim_lo=self.align_idx-5, lim_hi=self.align_idx+5),
         ]
 

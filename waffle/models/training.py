@@ -72,8 +72,10 @@ class Model(object):
           #
         #   wf.window_waveform(time_point=self.conf.align_percent, early_samples=self.conf.align_idx, num_samples=dec_idx+dec_samples)
         #   wf.windowed_wf = np.concatenate((wf.windowed_wf[:dec_idx], wf.windowed_wf[dec_idx::dec_factor]))
-        #   wf.window_length = len(wf.windowed_wf)
-          print(wf.__dict__)
+
+          wf.window_length = len(wf.windowed_wf)
+        #   print(wf.__dict__)
+
           self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector,
                         do_smoothing=wf_conf.do_smoothing, smoothing_type=wf_conf.smoothing_type))
 
