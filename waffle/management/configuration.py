@@ -9,7 +9,7 @@ class WaveformConfiguration(object):
         align_idx = 200,
         num_samples = 400,
         align_percent = 0.95,
-        do_smoothing=True,
+        do_smooth=True,
         wf_idxs=None,
         smoothing_type="gaussian"
     ):
@@ -18,7 +18,7 @@ class WaveformConfiguration(object):
         self.align_percent = align_percent
         self.num_samples = num_samples
         self.wf_idxs = wf_idxs
-        self.do_smoothing=do_smoothing
+        self.do_smooth=do_smooth
         self.smoothing_type=smoothing_type
 
         #downsampling the decay portion

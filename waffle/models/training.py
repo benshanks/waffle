@@ -77,7 +77,7 @@ class Model(object):
         #   print(wf.__dict__)
 
           self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector,
-                        do_smoothing=wf_conf.do_smoothing, smoothing_type=wf_conf.smoothing_type))
+                        do_smooth=wf_conf.do_smooth, smoothing_type=wf_conf.smoothing_type))
 
           if doPrint:
               print( "wf %d length %d (entry %d from run %d)" % (wf_idx, wf.window_length, wf.entry_number, wf.runNumber))
