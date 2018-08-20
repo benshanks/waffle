@@ -16,7 +16,7 @@ class WaveformModel(ModelBaseClass):
     """
     Specify the model in Python.
     """
-    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smooth=True, smoothing_type="gaussian"):
+    def __init__(self, target_wf, align_percent, detector, align_idx=125, do_smooth=True, smoothing_type="gauss"):
 
         self.detector = detector
 
@@ -37,7 +37,7 @@ class WaveformModel(ModelBaseClass):
         self.do_smooth=do_smooth
         self.smoothing_type = smoothing_type
         if do_smooth:
-            if smoothing_type == "gaussian":
+            if smoothing_type == "gauss":
                 smooth_guess = 20
                 self.params.append(Parameter("smooth", "gaussian", mean=smooth_guess, variance=10, lim_lo=1, lim_hi=100))
             elif smoothing_type == "skew":

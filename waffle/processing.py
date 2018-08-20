@@ -59,8 +59,8 @@ class DataProcessor():
             t1["runNumber"]=runNumber
             dfs.append(t1)
 
-            print(t1.head())
-            exit()
+            dfs.append(t2)
+        df = pd.concat(dfs, axis=0)
 
         return df
 
@@ -363,21 +363,18 @@ class DataProcessor():
         chan_dfs = []
         for runNumber in runList:
             t1_file = os.path.join(self.t1_data_dir, "t1_run{}.h5".format(runNumber))
-            channel_info = pd.read_hdf(t1_file,key="ORGretina4MWaveformDecoder")
+            channel_info = pd.read_hdf(t1_file,key="channel_info")
             chan_dfs.append(channel_info)
 
         chan_df = pd.concat(chan_dfs, axis=0)
         chanList = np.unique(chan_df["channel"])
 
-        # print(chan_df)
-        # print(channel_info)
-
         NLCMap = []
         for ccc in chanList:
             try:
-                # boardSN = chan_df.loc[ccc].board_id
+                boardSN = chan_df.loc[ccc].board_id
                 # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id
-                boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id[1]
+                # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id[1]
                 # NLCMap[chan] = load_nonlinearities(serial, chan, runList)
                 print("For {}, board SN is {}".format(ccc,boardSN))
 
@@ -429,7 +426,6 @@ class DataProcessor():
 
 
         df_nl = pd.DataFrame(NLCMap)
-        print(df_nl)
         df_nl.set_index("channel", drop=False, inplace=True)
 
 
@@ -451,11 +447,6 @@ class DataProcessor():
 
         #is the wf saturated?
         procs.AddCalculator(is_saturated, {}, output_name="is_saturated")
-
-        # Trim a few values from the beginning and end
-        procs.AddTransform(trim_waveform, {"n_samples_before":15,
-                                           "n_samples_after":5
-                                           }, input_waveform="waveform",output_waveform="trim_wf")
 
         #nonlinearity_correct
         # db_path = self.nl_file_name
@@ -481,9 +472,8 @@ class DataProcessor():
         procs.AddTransform(pz_correct, {"rc":72}, input_waveform="blrmnlc_wf", output_waveform="pz_wf")
         procs.AddTransform(trap_filter, {"rampTime":400, "flatTime":200}, input_waveform="pz_wf", output_waveform="trap_wf")
 
-        # procs.AddCalculator(trap_max, {}, input_waveform="trap_wf", output_name="trap_max")
+        procs.AddCalculator(trap_max, {}, input_waveform="trap_wf", output_name="trap_max")
         procs.AddCalculator(trap_max, {"method":"fixed_time","pickoff_sample":400}, input_waveform="trap_wf", output_name="trap_ft")
-        procs.AddCalculator(trap_max, {"method":"max","pickoff_sample":0}, input_waveform="trap_wf", output_name="trap_max")
 
         #calculate a few time points
         tps = np.array([0.3,0.4,0.5,0.6,0.7,0.8, 0.9, 0.95,0.99])

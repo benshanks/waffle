@@ -53,13 +53,11 @@ class ResultBase():
 
         if num_to_read == -1:
             self.result_data = data
-        elif num_samples > num_to_read:
+        elif num_samples >= num_to_read:
             num_samples = num_to_read
             end_idx = len(data.index) - 1
             self.result_data = data.iloc[(end_idx - num_samples):end_idx:sample_dec]
         elif num_samples < num_to_read:
-            self.result_data = data
-        elif num_samples == num_to_read:
             self.result_data = data
 
         print( "Using the last {} samples".format( len(self.result_data)) )

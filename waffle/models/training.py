@@ -72,18 +72,14 @@ class Model(object):
           #
         #   wf.window_waveform(time_point=self.conf.align_percent, early_samples=self.conf.align_idx, num_samples=dec_idx+dec_samples)
         #   wf.windowed_wf = np.concatenate((wf.windowed_wf[:dec_idx], wf.windowed_wf[dec_idx::dec_factor]))
-
-          wf.window_length = len(wf.windowed_wf)
-        #   print(wf.__dict__)
+        #   wf.window_length = len(wf.windowed_wf)
 
           self.wf_models.append(WaveformModel(wf, align_percent=wf_conf.align_percent, detector=self.detector,
                         do_smooth=wf_conf.do_smooth, smoothing_type=wf_conf.smoothing_type))
 
           if doPrint:
               print( "wf %d length %d (entry %d from run %d)" % (wf_idx, wf.window_length, wf.entry_number, wf.runNumber))
-
-          t0_estimate = np.argmax(wf.data > 0.95)
-          baselineLengths[wf_idx] = t0_estimate
+          baselineLengths[wf_idx] = wf.t0_estimate
 
         #TODO: this doesn't work if the calc step size isn't 1 ns
         self.siggen_wf_length = np.int(  (wf_conf.align_idx - np.amin(baselineLengths) + 10)*(10  ))
