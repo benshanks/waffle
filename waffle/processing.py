@@ -59,7 +59,6 @@ class DataProcessor():
             t1["runNumber"]=runNumber
             dfs.append(t1)
 
-            dfs.append(t2)
         df = pd.concat(dfs, axis=0)
 
         return df
