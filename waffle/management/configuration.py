@@ -11,7 +11,7 @@ class WaveformConfiguration(object):
         align_percent = 0.95,
         do_smooth=True,
         wf_idxs=None,
-        smoothing_type="gaussian"
+        smoothing_type="gauss"
     ):
         self.wf_file_name=wf_file_name
         self.align_idx = align_idx

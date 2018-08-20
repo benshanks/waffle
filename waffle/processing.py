@@ -372,7 +372,7 @@ class DataProcessor():
         NLCMap = []
         for ccc in chanList:
             try:
-                boardSN = chan_df.loc[ccc].board_id
+                boardSN = channel_info.loc[ccc].board_id
                 # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id
                 # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id[1]
                 # NLCMap[chan] = load_nonlinearities(serial, chan, runList)

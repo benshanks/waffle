@@ -16,7 +16,6 @@ class JointModelBundle(object):
 
         self.num_params = 0
         i=0
-        # print(self.conf)
 
         for model_idx, (model_name, model_conf) in enumerate(self.conf):
             model = self.append(model_name, model_conf)
