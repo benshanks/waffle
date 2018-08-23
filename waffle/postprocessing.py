@@ -24,11 +24,11 @@ colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown"
 
 
 class ResultBase():
-    def __init__(self, result_directory, num_samples, sample_dec=1):
+    def __init__(self, result_directory, num_samples, sample_dec=1, model_type="Model"):
         self.parse_samples("sample.txt", result_directory, num_samples, sample_dec)
-        
+
         self.configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
-        
+
         if model_type == "Model":
             self.model = Model(self.configuration)
         elif model_type == "PulserTrainingModel":
@@ -65,7 +65,7 @@ class ResultBase():
 
 class TrainingPlotter(ResultBase):
     def __init__(self, result_directory, num_samples, sample_dec=1, model_type="Model"):
-        super().__init__(result_directory, num_samples, sample_dec)
+        super().__init__(result_directory, num_samples, sample_dec, model_type)
 
         # configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
 
@@ -426,20 +426,20 @@ class WaveformFitPlotter(ResultBase):
 
 class TrainingResultSummary(ResultBase):
     def __init__(self, result_directory, num_samples, sample_dec=1, model_type="Model"):
-        super().__init__(result_directory, num_samples, sample_dec)
+        super().__init__(result_directory, num_samples, sample_dec, model_type)
 
         self.params_values = {}
+        self.params_summary = {}
 
     def extract_model_values(self):
-        """Dump the contents of the fit results into a dictionary, where 
+        """Dump the contents of the fit results into a dictionary, where
         the outputs are labeled by parameter names.
         Results are stored in the self.params_values dict
         """
         for idx, row in self.result_data.iterrows():
-            mod_idx = -1
 
-            for model in self.model.joint_models.models:
-                mod_idx +=1
+            for mod_idx, model in enumerate(self.model.joint_models.models):
+
                 data = row[model.start_idx: model.start_idx + model.num_params].values
 
                 model_name = type(model).__name__
@@ -453,10 +453,13 @@ class TrainingResultSummary(ResultBase):
                 for i,name in enumerate(param_names):
                     self.params_values[model_name][name].append(data[i])
 
-    def summarize_params(self,do_plots=False):
-        """ Plot out histograms of the parameters 
+    def summarize_params(self,do_plots=False, verbose=True):
+        """ Plot out histograms of the parameters
+            Save summary parameters to self.params_summary field
         """
         for the_model,the_params in self.params_values.items():
+            self.params_summary[the_model] = {}
+
             print("Model Results: {}".format(the_model))
             if(do_plots):
                 plt.figure().suptitle(the_model)
@@ -464,9 +467,17 @@ class TrainingResultSummary(ResultBase):
             for val_name,val_array in the_params.items():
                 avg = np.average(val_array)
                 stdev = np.std(val_array)
-                print("    {}:".format(val_name))
-                print("         avg:{}".format(avg))
-                print("         std:{}".format(stdev))
+                median = np.percentile(val_array, 50)
+                self.params_summary[the_model][val_name] = {}
+                self.params_summary[the_model][val_name]["mean"] = avg
+                self.params_summary[the_model][val_name]["std"] = stdev
+                self.params_summary[the_model][val_name]["median"] = median
+
+                if verbose:
+                    print("    {}:".format(val_name))
+                    print("         avg:{}".format(avg))
+                    print("         std:{}".format(stdev))
+                    print("         med:{}".format(median))
 
                 if(do_plots):
                     plot_num += 1
