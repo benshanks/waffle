@@ -59,8 +59,7 @@ class DataProcessor():
             t1["runNumber"]=runNumber
             dfs.append(t1)
 
-            print(t1.head())
-            exit()
+        df = pd.concat(dfs, axis=0)
 
         return df
 
@@ -373,10 +372,14 @@ class DataProcessor():
         for ccc in chanList:
             try:
                 boardSN = channel_info.loc[ccc].board_id
+                # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id
+                # boardSN = chan_df.loc[chan_df['channel'] == ccc].board_id[1]
                 # NLCMap[chan] = load_nonlinearities(serial, chan, runList)
-                # print(boardSN)
+                print("For {}, board SN is {}".format(ccc,boardSN))
+
             except KeyError:
-                print("Channel {} not there?".format(chan))
+                print("Channel {} not there?".format(ccc))
+                continue
 
             crate = ccc >> 9
             card = (ccc & 0xff) >>4

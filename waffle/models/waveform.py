@@ -63,7 +63,7 @@ class WaveformModel(ModelBaseClass):
 
         reps = 1
         if rng.rand() < 0.5:
-            reps += np.int(np.power(100.0, rng.rand()));
+            reps += np.int(np.power(100.0, rng.rand()))
 
         for i in range(reps):
             which = rng.randint(self.num_params)

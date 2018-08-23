@@ -74,9 +74,24 @@ def get_ortec_detector_info(detector_name):
     #fill in missing deadlayer info
     df_ortec['dead_layer'].fillna((df_ortec['dead_layer'].mean()), inplace=True)
 
-    detector_info = df_ortec.loc[detector_name]
-    det_starret = df_starret.loc[detector_name]
-    det_contact = df_contact.loc[detector_name]
+    try:
+        detector_info = df_ortec.loc[detector_name]
+    except KeyError as e:
+        print(e)
+        print("The detector {} you are generating was not located in the ortec measurement spreadsheet ({})".format(detector_name,ortec_file_name))
+        exit()
+    try:
+        det_starret = df_starret.loc[detector_name]
+    except KeyError as e:
+        print(e)
+        print("The detector {} you are generating was not located in the starrett measurement spreadsheet ({})".format(detector_name,starret_file_name))
+        exit()
+    try:
+        det_contact = df_contact.loc[detector_name]
+    except KeyError as e:
+        print(e)
+        print("The detector {} you are generating was not located in the contact measurement spreadsheet ({})".format(detector_name, contact_file_name))
+        exit()
 
     for param_name in starret_col_names[1:]:
         if np.isnan(det_starret[param_name]):

@@ -23,48 +23,63 @@ from waffle.models import Model, PulserTrainingModel
 colors = ["red" ,"blue", "green", "purple", "orange", "cyan", "magenta", "brown", "deeppink", "goldenrod", "lightsteelblue", "maroon", "violet", "lawngreen", "grey", "chocolate" ]
 
 
-class PlotterBase():
+class ResultBase():
     def __init__(self, result_directory, num_samples, sample_dec=1):
         self.parse_samples("sample.txt", result_directory, num_samples, sample_dec)
+        
+        self.configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
+        
+        if model_type == "Model":
+            self.model = Model(self.configuration)
+        elif model_type == "PulserTrainingModel":
+            self.model = PulserTrainingModel(self.configuration)
+
+        self.num_wf_params = self.model.num_wf_params
+        self.wf_conf = self.model.conf.wf_conf
+        self.model_conf = self.model.conf.model_conf
+
+        # For plots:
         self.width = 18
 
-    def parse_samples(self, sample_file_name, directory, plotNum, sample_dec=1):
-
-        #Load the data from csv (using pandas so its fast)
+    def parse_samples(self, sample_file_name, directory, num_to_read, sample_dec=1):
+        """Load the data from CSV
+        Uses pandas so its fast
+        """
         sample_file_name = os.path.join(directory, sample_file_name)
         data = pd.read_csv(sample_file_name, delim_whitespace=True, header=None)
         num_samples = len(data.index)
-        print( "found {} samples... ".format(num_samples), end='')
 
-        if plotNum == -1:
-            self.plot_data = data
-        elif num_samples >= plotNum:
-            num_samples = plotNum
+        print("Found {} samples... ".format(num_samples), end='')
+
+        if num_to_read == -1:
+            self.result_data = data
+        elif num_samples >= num_to_read:
+            num_samples = num_to_read
             end_idx = len(data.index) - 1
-            self.plot_data = data.iloc[(end_idx - num_samples):end_idx:sample_dec]
-        elif num_samples < plotNum:
-            self.plot_data = data
+            self.result_data = data.iloc[(end_idx - num_samples):end_idx:sample_dec]
+        elif num_samples < num_to_read:
+            self.result_data = data
 
-        print( " plotting {} samples".format( len(self.plot_data) ))
+        print( "Using the last {} samples".format( len(self.result_data)) )
 
 
-class TrainingPlotter(PlotterBase):
+class TrainingPlotter(ResultBase):
     def __init__(self, result_directory, num_samples, sample_dec=1, model_type="Model"):
         super().__init__(result_directory, num_samples, sample_dec)
 
-        configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
+        # configuration = FitConfiguration(directory=result_directory, loadSavedConfig=True)
 
-        if model_type == "Model":
-            self.model = Model(configuration)
-        elif model_type == "PulserTrainingModel":
-            self.model = PulserTrainingModel(configuration)
+        # if model_type == "Model":
+        #     self.model = Model(configuration)
+        # elif model_type == "PulserTrainingModel":
+        #     self.model = PulserTrainingModel(configuration)
 
-        self.num_wf_params = self.model.num_wf_params
+        # self.num_wf_params = self.model.num_wf_params
 
         # end_idx = 10000
 
     def plot_waveforms(self, print_det_params=False):
-        data = self.plot_data
+        data = self.result_data
         model = self.model
 
         bad_wf_thresh = 1000
@@ -144,7 +159,7 @@ class TrainingPlotter(PlotterBase):
         plt.savefig("average_residual.pdf")
 
     def plot_waveform_components(self):
-        data = self.plot_data
+        data = self.result_data
         model = self.model
 
         plt.figure(figsize=(self.width,8))
@@ -196,7 +211,7 @@ class TrainingPlotter(PlotterBase):
         square_fig = plt.figure()
         square_ax = plt.gca()
 
-        for idx, row in self.plot_data.iterrows():
+        for idx, row in self.result_data.iterrows():
             mod_idx = -1
 
             #show the square response for the whole thing
@@ -268,7 +283,36 @@ class TrainingPlotter(PlotterBase):
 
     def plot_imp(self):
         im = self.model.imp_model
-        imp_data = self.plot_data.iloc[:, self.model.imp_first_idx: self.model.imp_first_idx + im.get_num_params()]
+        imp_data = self.result_data.iloc[:, self.model.imp_first_idx: self.model.imp_first_idx + im.get_num_params()]
+
+        imp_z0 = imp_data.iloc[:,0].as_matrix()
+        imp_zmax = imp_data.iloc[:,1].as_matrix()
+
+        g = sns.jointplot(x=imp_z0, y=imp_zmax, kind="kde", stat_func=None)
+
+        avgs = self.model.detector.imp_avg_points
+        grads = self.model.detector.imp_grad_points
+
+        # plt.figure()
+
+        for avg in avgs:
+            y1 = 2*avg - im.imp_max
+            y2 = 2*avg - 0
+            g.ax_joint.plot((im.imp_max, 0), (y1, y2), c="k", ls="--")
+        for grad in grads:
+            y1 = (grad*self.model.detector.detector_length/10) + im.imp_max
+            y2 = (grad*self.model.detector.detector_length/10) + 0
+
+            g.ax_joint.plot((im.imp_max, 0), (y1, y2), c="k", ls="--")
+
+        g.ax_joint.set_xlim(im.imp_max, 0)
+        g.ax_joint.set_ylim(im.imp_min, 0)
+
+        #overlay the grid of calculated points
+
+    def plot_imp_ends(self):
+        im = self.model.imp_model
+        imp_data = self.result_data.iloc[:, self.model.imp_first_idx: self.model.imp_first_idx + im.get_num_params()]
 
         imp_z0 = imp_data.iloc[:,0].as_matrix()
         imp_zmax = imp_data.iloc[:,1].as_matrix()
@@ -298,7 +342,7 @@ class TrainingPlotter(PlotterBase):
     def plot_trace(self):
         f, ax = plt.subplots(self.model.num_det_params, 1, figsize=(self.width,10), sharex=True)
         for i in range(self.model.num_det_params):
-            tf_data = self.plot_data[i]
+            tf_data = self.result_data[i]
             ax[i].plot(tf_data, ls="steps")
 
             #corresponding model
@@ -314,20 +358,20 @@ class TrainingPlotter(PlotterBase):
         # plt.xlim(0, len(tf_data))
 
     def plot_detector_pair(self):
-        g = sns.pairplot(self.plot_data.iloc[:, :self.model.num_det_params], diag_kind="kde")
+        g = sns.pairplot(self.result_data.iloc[:, :self.model.num_det_params], diag_kind="kde")
         plt.savefig("pairplot.png")
 
     def plot_waveform_trace(self):
         f, ax = plt.subplots(self.num_wf_params, 1, figsize=(self.width,10), sharex=True)
         for i in range(self.num_wf_params):
             for j in range (self.model.num_waveforms):
-                tf_data = self.plot_data[self.model.num_det_params + self.num_wf_params*j+i]
+                tf_data = self.result_data[self.model.num_det_params + self.num_wf_params*j+i]
                 try:
                     ax[i].plot(tf_data, color=colors[j], ls="steps")
                 except TypeError:
                     ax.plot(tf_data, color=colors[j], ls="steps")
 
-class WaveformFitPlotter(PlotterBase):
+class WaveformFitPlotter(ResultBase):
 
     def __init__(self, result_directory, num_samples, wf_model):
         super().__init__(result_directory, num_samples)
@@ -337,11 +381,11 @@ class WaveformFitPlotter(PlotterBase):
     def plot_trace(self):
         f, ax = plt.subplots(self.wf_model.num_params, 1, figsize=(self.width,10), sharex=True)
         for i in range(self.wf_model.num_params):
-            tf_data = self.plot_data[i]
+            tf_data = self.result_data[i]
             ax[i].plot(tf_data)
 
     def plot_waveform(self):
-        data = self.plot_data
+        data = self.result_data
         wf_model = self.wf_model
         wf = wf_model.target_wf
         wf_idx = 0
@@ -379,3 +423,60 @@ class WaveformFitPlotter(PlotterBase):
         # ax0.axvline(x=model.conf.align_idx*10,color="black", ls=":")
         # ax1.axvline(x=model.conf.align_idx*10,color="black", ls=":")
         # ax1.set_ylim(-bad_wf_thresh, bad_wf_thresh)
+
+class TrainingResultSummary(ResultBase):
+    def __init__(self, result_directory, num_samples, sample_dec=1, model_type="Model"):
+        super().__init__(result_directory, num_samples, sample_dec)
+
+        self.params_values = {}
+
+    def extract_model_values(self):
+        """Dump the contents of the fit results into a dictionary, where 
+        the outputs are labeled by parameter names.
+        Results are stored in the self.params_values dict
+        """
+        for idx, row in self.result_data.iterrows():
+            mod_idx = -1
+
+            for model in self.model.joint_models.models:
+                mod_idx +=1
+                data = row[model.start_idx: model.start_idx + model.num_params].values
+
+                model_name = type(model).__name__
+                param_names = [model.params[i].name for i in range(model.num_params)]
+
+                if model_name not in self.params_values:
+                    self.params_values[model_name] = {}
+                    for name in param_names:
+                        self.params_values[model_name][name] = []
+
+                for i,name in enumerate(param_names):
+                    self.params_values[model_name][name].append(data[i])
+
+    def summarize_params(self,do_plots=False):
+        """ Plot out histograms of the parameters 
+        """
+        for the_model,the_params in self.params_values.items():
+            print("Model Results: {}".format(the_model))
+            if(do_plots):
+                plt.figure().suptitle(the_model)
+                plot_num = 0
+            for val_name,val_array in the_params.items():
+                avg = np.average(val_array)
+                stdev = np.std(val_array)
+                print("    {}:".format(val_name))
+                print("         avg:{}".format(avg))
+                print("         std:{}".format(stdev))
+
+                if(do_plots):
+                    plot_num += 1
+                    plt.subplot(len(the_params.keys()),1,plot_num)
+                    plt.hist(val_array,100)
+                    plt.axvline(avg,color='r',linestyle='dashed')
+                    plt.axvline(avg+stdev,color='r',linestyle='dashed')
+                    plt.axvline(avg-stdev,color='r',linestyle='dashed')
+                    plt.title(val_name)
+                    plt.tight_layout()
+                    plt.subplots_adjust(top=0.85)
+        if(do_plots):
+            plt.show()
