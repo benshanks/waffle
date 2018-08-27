@@ -436,22 +436,22 @@ class TrainingResultSummary(ResultBase):
         the outputs are labeled by parameter names.
         Results are stored in the self.params_values dict
         """
-        for idx, row in self.result_data.iterrows():
+        # for idx, row in self.result_data.iterrows():
 
-            for mod_idx, model in enumerate(self.model.joint_models.models):
+        for mod_idx, model in enumerate(self.model.joint_models.models):
 
-                data = row[model.start_idx: model.start_idx + model.num_params].values
+            data = self.result_data.iloc[:, model.start_idx: model.start_idx + model.num_params]
 
-                model_name = type(model).__name__
-                param_names = [model.params[i].name for i in range(model.num_params)]
+            model_name = type(model).__name__
+            param_names = [model.params[i].name for i in range(model.num_params)]
 
-                if model_name not in self.params_values:
-                    self.params_values[model_name] = {}
-                    for name in param_names:
-                        self.params_values[model_name][name] = []
+            if model_name in self.params_values:
+                model_name = model_name + "_2"
 
-                for i,name in enumerate(param_names):
-                    self.params_values[model_name][name].append(data[i])
+            self.params_values[model_name] = {}
+
+            for i,name in enumerate(param_names):
+                self.params_values[model_name][name] = data.iloc[:,i].values
 
     def summarize_params(self,do_plots=False, verbose=True):
         """ Plot out histograms of the parameters
